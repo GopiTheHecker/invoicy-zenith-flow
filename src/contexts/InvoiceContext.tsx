@@ -8,6 +8,9 @@ export type InvoiceItem = {
   quantity: number;
   rate: number;
   amount: number;
+  hsnCode: string;
+  gstRate: number;
+  discountPercent: number;
 };
 
 export type Invoice = {
@@ -15,17 +18,32 @@ export type Invoice = {
   invoiceNumber: string;
   issueDate: string;
   dueDate: string;
+  paymentTerms: string;
   client: {
     name: string;
     email: string;
     phone: string;
     address: string;
+    gstin: string;
+    state: string;
+  };
+  company: {
+    name: string;
+    address: string;
+    gstin: string;
+    state: string;
+    signatory: string;
   };
   items: InvoiceItem[];
   subtotal: number;
-  tax: number;
+  totalCGST: number;
+  totalSGST: number;
+  totalIGST: number;
+  totalGST: number;
   discount: number;
   total: number;
+  roundedTotal: number;
+  amountInWords: string;
   notes: string;
   terms: string;
   logo?: string;
@@ -41,7 +59,16 @@ type InvoiceContextType = {
   updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
   getInvoice: (id: string) => Invoice | undefined;
   generateInvoiceNumber: () => string;
-  calculateInvoiceValues: (items: InvoiceItem[], tax: number, discount: number) => { subtotal: number, total: number };
+  calculateInvoiceValues: (items: InvoiceItem[], discount: number, sameState: boolean) => { 
+    subtotal: number, 
+    totalCGST: number, 
+    totalSGST: number, 
+    totalIGST: number,
+    totalGST: number, 
+    total: number,
+    roundedTotal: number,
+    amountInWords: string 
+  };
 };
 
 const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
@@ -97,24 +124,124 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const generateInvoiceNumber = () => {
-    const prefix = "INV";
-    const randomNum = Math.floor(10000 + Math.random() * 90000);
-    const date = new Date();
-    const year = date.getFullYear().toString().substr(-2);
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    // Format: SIT-XXX-24-25 (Incremental number for each new bill)
+    const currentYear = new Date().getFullYear();
+    const yearPart = `${(currentYear % 100)}-${(currentYear % 100) + 1}`;
     
-    return `${prefix}-${year}${month}-${randomNum}`;
+    const prefix = "SIT";
+    const latestInvoice = invoices
+      .filter(inv => inv.invoiceNumber.startsWith(prefix))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    
+    let sequenceNumber = 1;
+    
+    if (latestInvoice) {
+      const parts = latestInvoice.invoiceNumber.split('-');
+      if (parts.length >= 2) {
+        const lastNumber = parseInt(parts[1], 10);
+        if (!isNaN(lastNumber)) {
+          sequenceNumber = lastNumber + 1;
+        }
+      }
+    }
+    
+    return `${prefix}-${String(sequenceNumber).padStart(3, '0')}-${yearPart}`;
   };
 
-  const calculateInvoiceValues = (items: InvoiceItem[], tax: number, discount: number) => {
+  // Function to convert number to words for Indian Rupees
+  const numberToWords = (num: number) => {
+    const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  
+    const convertLessThanOneThousand = (num: number) => {
+      if (num === 0) {
+        return '';
+      }
+      if (num < 20) {
+        return units[num];
+      }
+      const digit = num % 10;
+      if (num < 100) {
+        return tens[Math.floor(num / 10)] + (digit ? ' ' + units[digit] : '');
+      }
+      return units[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' and ' + convertLessThanOneThousand(num % 100) : '');
+    };
+  
+    if (num === 0) return 'Zero Rupees Only';
+    
+    const intNum = Math.floor(num);
+    const paise = Math.round((num - intNum) * 100);
+    
+    let result = '';
+    
+    if (intNum > 0) {
+      let lakh = Math.floor(intNum / 100000);
+      intNum %= 100000;
+      
+      let thousand = Math.floor(intNum / 1000);
+      intNum %= 1000;
+      
+      let remaining = intNum;
+      
+      if (lakh) {
+        result += convertLessThanOneThousand(lakh) + ' Lakh ';
+      }
+      
+      if (thousand) {
+        result += convertLessThanOneThousand(thousand) + ' Thousand ';
+      }
+      
+      if (remaining) {
+        result += convertLessThanOneThousand(remaining);
+      }
+      
+      result = result.trim() + ' Rupees';
+    }
+    
+    if (paise) {
+      result += ' and ' + convertLessThanOneThousand(paise) + ' Paise';
+    }
+    
+    return result + ' Only';
+  };
+
+  const calculateInvoiceValues = (items: InvoiceItem[], discount: number, sameState: boolean) => {
     const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-    const taxAmount = (subtotal * tax) / 100;
     const discountAmount = (subtotal * discount) / 100;
-    const total = subtotal + taxAmount - discountAmount;
+    const taxableAmount = subtotal - discountAmount;
+
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let totalIGST = 0;
+    
+    items.forEach(item => {
+      const itemAmount = item.amount - (item.amount * (item.discountPercent || 0)) / 100;
+      const gstAmount = (itemAmount * item.gstRate) / 100;
+      
+      if (sameState) {
+        // Split into CGST and SGST
+        totalCGST += gstAmount / 2;
+        totalSGST += gstAmount / 2;
+      } else {
+        // Apply full GST as IGST
+        totalIGST += gstAmount;
+      }
+    });
+    
+    const totalGST = totalCGST + totalSGST + totalIGST;
+    const total = taxableAmount + totalGST;
+    const roundedTotal = Math.round(total);
+    const amountInWords = numberToWords(roundedTotal);
 
     return {
       subtotal,
-      total
+      totalCGST,
+      totalSGST,
+      totalIGST,
+      totalGST,
+      total,
+      roundedTotal,
+      amountInWords
     };
   };
 

@@ -10,6 +10,17 @@ import { useInvoices, InvoiceItem as InvoiceItemType } from "@/contexts/InvoiceC
 import InvoiceItem from "@/components/invoice/InvoiceItem";
 import { v4 as uuidv4 } from 'uuid';
 import { ArrowLeft, Eye, Plus, Save } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// List of Indian states
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", 
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", 
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 const InvoiceGenerator = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,17 +31,37 @@ const InvoiceGenerator = () => {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [issueDate, setIssueDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
+  
+  // Client details
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
+  const [clientGstin, setClientGstin] = useState("");
+  const [clientState, setClientState] = useState("Tamil Nadu");
+  
+  // Company details
+  const [companyName, setCompanyName] = useState("Spark Invotech Pvt. Ltd.");
+  const [companyAddress, setCompanyAddress] = useState("H-Block, SRI SAIRAM ENGINEERING COLLEGE, Chennai, Tamil Nadu 600044.");
+  const [companyGstin, setCompanyGstin] = useState("");
+  const [companyState, setCompanyState] = useState("Tamil Nadu");
+  const [companySignatory, setCompanySignatory] = useState("Tharunkumar P.");
+  
   const [items, setItems] = useState<InvoiceItemType[]>([]);
-  const [tax, setTax] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState("");
+  
+  // Calculated values
   const [subtotal, setSubtotal] = useState(0);
+  const [totalCGST, setTotalCGST] = useState(0);
+  const [totalSGST, setTotalSGST] = useState(0);
+  const [totalIGST, setTotalIGST] = useState(0);
+  const [totalGST, setTotalGST] = useState(0);
   const [total, setTotal] = useState(0);
+  const [roundedTotal, setRoundedTotal] = useState(0);
+  const [amountInWords, setAmountInWords] = useState("");
   
   // Initialize with current date or existing invoice data
   useEffect(() => {
@@ -43,8 +74,9 @@ const InvoiceGenerator = () => {
       setInvoiceNumber(generateInvoiceNumber());
       setIssueDate(today.toISOString().split('T')[0]);
       setDueDate(dueDate.toISOString().split('T')[0]);
+      setPaymentTerms("Net 30 days");
       setItems([createEmptyItem()]);
-      setTerms("Payment due within 30 days of issue.");
+      setTerms("1. Payment due within 30 days of issue.\n2. Goods once sold will not be taken back.\n3. Interest @18% p.a. will be charged on delayed payments.");
       return;
     }
 
@@ -55,35 +87,72 @@ const InvoiceGenerator = () => {
       setInvoiceNumber(existingInvoice.invoiceNumber);
       setIssueDate(existingInvoice.issueDate);
       setDueDate(existingInvoice.dueDate);
+      setPaymentTerms(existingInvoice.paymentTerms);
+      
       setClientName(existingInvoice.client.name);
       setClientEmail(existingInvoice.client.email);
       setClientPhone(existingInvoice.client.phone);
       setClientAddress(existingInvoice.client.address);
+      setClientGstin(existingInvoice.client.gstin);
+      setClientState(existingInvoice.client.state);
+      
+      setCompanyName(existingInvoice.company.name);
+      setCompanyAddress(existingInvoice.company.address);
+      setCompanyGstin(existingInvoice.company.gstin);
+      setCompanyState(existingInvoice.company.state);
+      setCompanySignatory(existingInvoice.company.signatory);
+      
       setItems(existingInvoice.items);
-      setTax(existingInvoice.tax);
       setDiscount(existingInvoice.discount);
       setNotes(existingInvoice.notes);
       setTerms(existingInvoice.terms);
+      
       setSubtotal(existingInvoice.subtotal);
+      setTotalCGST(existingInvoice.totalCGST);
+      setTotalSGST(existingInvoice.totalSGST);
+      setTotalIGST(existingInvoice.totalIGST);
+      setTotalGST(existingInvoice.totalGST);
       setTotal(existingInvoice.total);
+      setRoundedTotal(existingInvoice.roundedTotal);
+      setAmountInWords(existingInvoice.amountInWords);
     } else {
       navigate("/invoice/new", { replace: true });
     }
   }, [id, getInvoice, navigate, generateInvoiceNumber]);
 
-  // Recalculate totals whenever items, tax, or discount change
+  // Recalculate totals whenever items, discount, or state changes
   useEffect(() => {
-    const { subtotal, total } = calculateInvoiceValues(items, tax, discount);
+    const sameState = clientState === companyState;
+    const { 
+      subtotal, 
+      totalCGST, 
+      totalSGST, 
+      totalIGST, 
+      totalGST, 
+      total,
+      roundedTotal,
+      amountInWords
+    } = calculateInvoiceValues(items, discount, sameState);
+    
     setSubtotal(subtotal);
+    setTotalCGST(totalCGST);
+    setTotalSGST(totalSGST);
+    setTotalIGST(totalIGST);
+    setTotalGST(totalGST);
     setTotal(total);
-  }, [items, tax, discount, calculateInvoiceValues]);
+    setRoundedTotal(roundedTotal);
+    setAmountInWords(amountInWords);
+  }, [items, discount, clientState, companyState, calculateInvoiceValues]);
 
   const createEmptyItem = (): InvoiceItemType => ({
     id: uuidv4(),
     description: "",
     quantity: 1,
     rate: 0,
-    amount: 0
+    amount: 0,
+    hsnCode: "",
+    gstRate: 18, // Default GST rate in India
+    discountPercent: 0
   });
 
   const handleAddItem = () => {
@@ -112,21 +181,38 @@ const InvoiceGenerator = () => {
   };
 
   const handleSubmit = (preview: boolean = false) => {
+    const sameState = clientState === companyState;
+    
     const invoiceData = {
       invoiceNumber,
       issueDate,
       dueDate,
+      paymentTerms,
       client: {
         name: clientName,
         email: clientEmail,
         phone: clientPhone,
-        address: clientAddress
+        address: clientAddress,
+        gstin: clientGstin,
+        state: clientState
+      },
+      company: {
+        name: companyName,
+        address: companyAddress,
+        gstin: companyGstin,
+        state: companyState,
+        signatory: companySignatory
       },
       items,
       subtotal,
-      tax,
+      totalCGST,
+      totalSGST,
+      totalIGST,
+      totalGST,
       discount,
       total,
+      roundedTotal,
+      amountInWords,
       notes,
       terms,
       logo,
@@ -185,10 +271,10 @@ const InvoiceGenerator = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Logo & Invoice Info */}
+        {/* Company Logo & Invoice Info */}
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Company Logo & Invoice Info</CardTitle>
+            <CardTitle>Company & Invoice Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Logo Upload */}
@@ -226,6 +312,75 @@ const InvoiceGenerator = () => {
               </div>
             </div>
 
+            {/* Company Details */}
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Company Name</Label>
+              <Input
+                id="companyName"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Your company name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="companyGstin">Company GSTIN</Label>
+              <Input
+                id="companyGstin"
+                value={companyGstin}
+                onChange={(e) => setCompanyGstin(e.target.value)}
+                placeholder="e.g. 22AAAAA0000A1Z5"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="companyState">Company State</Label>
+              <Select 
+                value={companyState} 
+                onValueChange={setCompanyState}
+              >
+                <SelectTrigger id="companyState">
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INDIAN_STATES.map(state => (
+                    <SelectItem key={state} value={state}>
+                      {state}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="companyAddress">Company Address</Label>
+              <Textarea
+                id="companyAddress"
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                placeholder="Full address"
+                rows={3}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="companySignatory">Authorized Signatory</Label>
+              <Input
+                id="companySignatory"
+                value={companySignatory}
+                onChange={(e) => setCompanySignatory(e.target.value)}
+                placeholder="Name of signatory"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Invoice Details */}
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Invoice Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {/* Invoice Number */}
             <div className="space-y-2">
               <Label htmlFor="invoiceNumber">Invoice Number</Label>
@@ -233,7 +388,7 @@ const InvoiceGenerator = () => {
                 id="invoiceNumber"
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="e.g. INV-2025-001"
+                placeholder="e.g. SIT-001-24-25"
               />
             </div>
 
@@ -256,6 +411,39 @@ const InvoiceGenerator = () => {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+            
+            {/* Payment Terms */}
+            <div className="space-y-2">
+              <Label htmlFor="paymentTerms">Payment Terms</Label>
+              <Input
+                id="paymentTerms"
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                placeholder="e.g. Net 30 days"
+              />
+            </div>
+            
+            <div className="mt-8 pt-4 border-t">
+              <Label>Notes</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional notes for the client"
+                className="mt-2"
+                rows={3}
+              />
+            </div>
+            
+            <div className="mt-4">
+              <Label>Terms & Conditions</Label>
+              <Textarea
+                value={terms}
+                onChange={(e) => setTerms(e.target.value)}
+                placeholder="Payment terms and conditions"
+                className="mt-2"
+                rows={3}
               />
             </div>
           </CardContent>
@@ -296,6 +484,33 @@ const InvoiceGenerator = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="clientGstin">Client GSTIN</Label>
+              <Input
+                id="clientGstin"
+                value={clientGstin}
+                onChange={(e) => setClientGstin(e.target.value)}
+                placeholder="e.g. 29AAAAA0000A1Z5"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="clientState">Client State</Label>
+              <Select 
+                value={clientState} 
+                onValueChange={setClientState}
+              >
+                <SelectTrigger id="clientState">
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INDIAN_STATES.map(state => (
+                    <SelectItem key={state} value={state}>
+                      {state}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="clientAddress">Client Address</Label>
               <Textarea
                 id="clientAddress"
@@ -303,26 +518,6 @@ const InvoiceGenerator = () => {
                 onChange={(e) => setClientAddress(e.target.value)}
                 placeholder="Full address"
                 rows={3}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tax & Discount */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Tax & Discount</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tax">Tax (%)</Label>
-              <Input
-                id="tax"
-                type="number"
-                value={tax}
-                onChange={(e) => setTax(parseFloat(e.target.value) || 0)}
-                min="0"
-                step="0.01"
               />
             </div>
             <div className="space-y-2">
@@ -336,28 +531,6 @@ const InvoiceGenerator = () => {
                 step="0.01"
               />
             </div>
-            
-            <div className="mt-8 pt-4 border-t">
-              <Label>Notes</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes for the client"
-                className="mt-2"
-                rows={3}
-              />
-            </div>
-            
-            <div className="mt-4">
-              <Label>Terms & Conditions</Label>
-              <Textarea
-                value={terms}
-                onChange={(e) => setTerms(e.target.value)}
-                placeholder="Payment terms and conditions"
-                className="mt-2"
-                rows={3}
-              />
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -369,11 +542,14 @@ const InvoiceGenerator = () => {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
-            <div className="hidden md:grid grid-cols-11 px-4 py-3 font-medium bg-gray-50 border-b">
-              <div className="col-span-4">Description</div>
-              <div className="col-span-2">Quantity</div>
-              <div className="col-span-2">Rate</div>
-              <div className="col-span-2">Amount</div>
+            <div className="hidden md:grid grid-cols-12 px-4 py-3 font-medium bg-gray-50 border-b">
+              <div className="col-span-1">HSN/SAC</div>
+              <div className="col-span-3">Description</div>
+              <div className="col-span-1">Qty</div>
+              <div className="col-span-2">Rate (₹)</div>
+              <div className="col-span-1">Disc %</div>
+              <div className="col-span-1">GST %</div>
+              <div className="col-span-2">Amount (₹)</div>
               <div className="col-span-1"></div>
             </div>
 
@@ -404,22 +580,57 @@ const InvoiceGenerator = () => {
           {/* Totals */}
           <div className="mt-6 border-t pt-4">
             <div className="flex justify-end">
-              <div className="w-full md:w-64 space-y-2">
+              <div className="w-full md:w-72 space-y-2">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
                 </div>
+                
+                {discount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Discount ({discount}%):</span>
+                    <span>-₹{((subtotal * discount) / 100).toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {totalCGST > 0 && (
+                  <div className="flex justify-between">
+                    <span>CGST:</span>
+                    <span>₹{totalCGST.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {totalSGST > 0 && (
+                  <div className="flex justify-between">
+                    <span>SGST:</span>
+                    <span>₹{totalSGST.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {totalIGST > 0 && (
+                  <div className="flex justify-between">
+                    <span>IGST:</span>
+                    <span>₹{totalIGST.toFixed(2)}</span>
+                  </div>
+                )}
+                
                 <div className="flex justify-between">
-                  <span>Tax ({tax}%):</span>
-                  <span>${((subtotal * tax) / 100).toFixed(2)}</span>
+                  <span>Total GST:</span>
+                  <span>₹{totalGST.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Discount ({discount}%):</span>
-                  <span>${((subtotal * discount) / 100).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold pt-2 border-t">
+                
+                <div className="flex justify-between pt-2">
                   <span>Total:</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>₹{total.toFixed(2)}</span>
+                </div>
+                
+                <div className="flex justify-between font-bold pt-2 border-t">
+                  <span>Rounded Total:</span>
+                  <span>₹{roundedTotal.toFixed(2)}</span>
+                </div>
+                
+                <div className="pt-2 text-sm text-gray-600">
+                  <p className="italic">{amountInWords}</p>
                 </div>
               </div>
             </div>

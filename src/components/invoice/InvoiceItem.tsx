@@ -34,8 +34,29 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
     onChange(item.id, { rate, amount });
   };
 
+  const handleHsnCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(item.id, { hsnCode: e.target.value });
+  };
+
+  const handleGstRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(item.id, { gstRate: parseFloat(e.target.value) || 0 });
+  };
+
+  const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(item.id, { discountPercent: parseFloat(e.target.value) || 0 });
+  };
+
   return (
     <div className="flex flex-col md:flex-row gap-3 items-start py-2 border-b last:border-b-0">
+      <div className="w-full md:w-24">
+        <Input 
+          type="text" 
+          placeholder="HSN/SAC" 
+          value={item.hsnCode || ''} 
+          onChange={handleHsnCodeChange} 
+        />
+      </div>
+      
       <div className="flex-grow">
         <Input 
           placeholder="Item description" 
@@ -44,7 +65,7 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
         />
       </div>
       
-      <div className="w-full md:w-24">
+      <div className="w-full md:w-20">
         <Input 
           type="number" 
           placeholder="Qty" 
@@ -55,10 +76,10 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
         />
       </div>
       
-      <div className="w-full md:w-32">
+      <div className="w-full md:w-28">
         <Input 
           type="number" 
-          placeholder="Rate" 
+          placeholder="Rate (₹)" 
           value={item.rate || ''} 
           onChange={handleRateChange}
           min="0"
@@ -66,9 +87,32 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
         />
       </div>
       
+      <div className="w-full md:w-20">
+        <Input 
+          type="number" 
+          placeholder="Disc %" 
+          value={item.discountPercent || ''} 
+          onChange={handleDiscountChange}
+          min="0"
+          max="100"
+          step="0.01"
+        />
+      </div>
+      
+      <div className="w-full md:w-20">
+        <Input 
+          type="number" 
+          placeholder="GST %" 
+          value={item.gstRate || ''} 
+          onChange={handleGstRateChange}
+          min="0"
+          step="0.01"
+        />
+      </div>
+      
       <div className="w-full md:w-32 flex items-center">
         <span className="bg-gray-50 px-3 py-2 rounded-md w-full text-right">
-          ${item.amount.toFixed(2)}
+          ₹{item.amount.toFixed(2)}
         </span>
       </div>
       
