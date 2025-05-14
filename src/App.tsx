@@ -15,7 +15,14 @@ import MainLayout from "./components/layouts/MainLayout";
 import RequireAuth from "./components/auth/RequireAuth";
 import Index from "./pages/Index";
 
-const queryClient = new QueryClient();
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
