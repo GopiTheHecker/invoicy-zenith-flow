@@ -22,10 +22,22 @@ app.use('/api/invoices', invoiceRouter);
 
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => console.error('MongoDB connection error:', error));
+  .then(() => {
+    console.log('Connected to MongoDB');
+    console.log('Database name:', mongoose.connection.name);
+  })
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+  });
+
+// Add more detailed logging for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
 
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Server URI: ${MONGODB_URI}`);
 });

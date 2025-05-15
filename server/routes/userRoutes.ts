@@ -10,11 +10,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 // Register a new user
 router.post('/register', async (req, res) => {
   try {
+    console.log('Register route hit with data:', req.body);
     const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      console.log('Registration missing required fields');
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
+      console.log('User already exists with email:', email);
       return res.status(400).json({ message: 'User already exists' });
     }
 
@@ -24,6 +31,8 @@ router.post('/register', async (req, res) => {
       email,
       password
     });
+
+    console.log('User created successfully with ID:', user._id);
 
     // Generate JWT token
     const token = jwt.sign(
@@ -39,6 +48,7 @@ router.post('/register', async (req, res) => {
       token
     });
   } catch (error: any) {
+    console.error('Registration error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -46,19 +56,29 @@ router.post('/register', async (req, res) => {
 // Login user
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login route hit with data:', req.body);
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      console.log('Login missing required fields');
+      return res.status(400).json({ message: 'Please provide email and password' });
+    }
 
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
+      console.log('User not found with email:', email);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     // Check if password is correct
     const isPasswordMatch = await user.comparePassword(password);
     if (!isPasswordMatch) {
+      console.log('Password does not match for user:', email);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
+
+    console.log('User logged in successfully:', user._id);
 
     // Generate JWT token
     const token = jwt.sign(
@@ -74,6 +94,7 @@ router.post('/login', async (req, res) => {
       token
     });
   } catch (error: any) {
+    console.error('Login error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -81,12 +102,15 @@ router.post('/login', async (req, res) => {
 // Get user profile
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
+    console.log('Profile route hit for user ID:', req.user?.id);
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
+      console.log('User not found with ID:', req.user.id);
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
   } catch (error: any) {
+    console.error('Profile error:', error);
     res.status(500).json({ message: error.message });
   }
 });
