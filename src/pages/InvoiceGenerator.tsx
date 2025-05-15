@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import { Invoice, InvoiceItem } from '@/contexts/InvoiceContext';
 
 const InvoiceGenerator = () => {
@@ -76,11 +76,19 @@ const InvoiceGenerator = () => {
         setTerms(invoice.terms);
         setLogo(invoice.logo);
       } else {
-        toast.error('Invoice not found');
+        toast({
+          title: "Error",
+          description: "Invoice not found",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error fetching invoice:', error);
-      toast.error('Failed to fetch invoice');
+      toast({
+        title: "Error",
+        description: "Failed to fetch invoice",
+        variant: "destructive"
+      });
     }
   };
 
@@ -123,9 +131,12 @@ const InvoiceGenerator = () => {
 
   useEffect(() => {
     setItems(prevItems =>
-      prevItems.map(item => ({ ...item, amount: calculateItemAmount(item) }))
+      prevItems.map(item => ({ 
+        ...item, 
+        amount: calculateItemAmount(item) 
+      }))
     );
-  }, [items.quantity, items.rate]);
+  }, [items]); // This will cause the effect to run whenever items changes
 
   const handleDiscountChange = (value: number) => {
     setDiscount(value);
@@ -177,7 +188,11 @@ const InvoiceGenerator = () => {
       navigate(`/invoice/${newInvoice.id}/preview`);
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast.error('Failed to save invoice');
+      toast({
+        title: "Error",
+        description: "Failed to save invoice",
+        variant: "destructive"
+      });
     }
   };
 
