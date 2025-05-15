@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, User, Mail, Lock } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 
 const Login = () => {
   // Login form state
@@ -53,7 +54,11 @@ const Login = () => {
     e.preventDefault();
     
     if (registerPassword !== confirmPassword) {
-      toast.error("Passwords don't match");
+      toast({
+        title: "Error",
+        description: "Passwords don't match",
+        variant: "destructive"
+      });
       return;
     }
     
