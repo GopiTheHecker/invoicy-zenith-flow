@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
+import { authService } from '@/services/authService';
 
 type User = {
   id: string;
@@ -11,6 +12,7 @@ type User = {
 type AuthContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 };
@@ -31,9 +33,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const token = localStorage.getItem('token');
+    if (token) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
     }
     setIsLoading(false);
   }, []);
@@ -42,30 +47,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Demo login logic - in a real app, you would validate with a backend
-      if (email && password.length >= 6) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock user data
-        const userData: User = {
-          id: '1',
-          email,
-          name: email.split('@')[0]
-        };
-        
-        // Save to state and localStorage
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        toast.success("Logged in successfully!");
-        return true;
-      } else {
-        toast.error("Invalid email or password");
-        return false;
-      }
-    } catch (error) {
-      toast.error("Login failed. Please try again.");
+      const response = await authService.login({ email, password });
+      
+      // Save to state and localStorage
+      const userData: User = {
+        id: response._id,
+        email: response.email,
+        name: response.name
+      };
+      
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', response.token);
+      
+      toast.success("Logged in successfully!");
+      return true;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
+      toast.error(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      const response = await authService.register({ name, email, password });
+      
+      // Save to state and localStorage
+      const userData: User = {
+        id: response._id,
+        email: response.email,
+        name: response.name
+      };
+      
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', response.token);
+      
+      toast.success("Account created successfully!");
+      return true;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Registration failed. Please try again.";
+      toast.error(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
@@ -75,11 +102,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     toast.info("Logged out successfully");
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

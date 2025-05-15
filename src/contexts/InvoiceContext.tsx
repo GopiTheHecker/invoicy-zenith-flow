@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
+import { invoiceService } from '@/services/invoiceService';
+import { useAuth } from './AuthContext';
 
 export type InvoiceItem = {
   id: string;
@@ -55,9 +57,9 @@ type InvoiceContextType = {
   invoices: Invoice[];
   currentInvoice: Invoice | null;
   setCurrentInvoice: (invoice: Invoice | null) => void;
-  createInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Invoice;
-  updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
-  getInvoice: (id: string) => Invoice | undefined;
+  createInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<Invoice>;
+  updateInvoice: (id: string, invoice: Partial<Invoice>) => Promise<void>;
+  getInvoice: (id: string) => Promise<Invoice | undefined>;
   generateInvoiceNumber: () => string;
   calculateInvoiceValues: (items: InvoiceItem[], discount: number, sameState: boolean) => { 
     subtotal: number, 
@@ -84,43 +86,78 @@ export const useInvoices = () => {
 export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+  const { user } = useAuth();
 
+  // Fetch invoices when user changes
   useEffect(() => {
-    // Load invoices from localStorage
-    const storedInvoices = localStorage.getItem('invoices');
-    if (storedInvoices) {
-      setInvoices(JSON.parse(storedInvoices));
+    if (user) {
+      fetchInvoices();
+    } else {
+      // If user is logged out, clear invoices
+      setInvoices([]);
     }
-  }, []);
+  }, [user]);
 
-  // Save invoices to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('invoices', JSON.stringify(invoices));
-  }, [invoices]);
-
-  const createInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
-    const newInvoice: Invoice = {
-      ...invoiceData,
-      id: `inv-${Date.now()}`,
-      createdAt: new Date().toISOString()
-    };
-
-    setInvoices(prev => [...prev, newInvoice]);
-    toast.success("Invoice created successfully!");
-    return newInvoice;
+  const fetchInvoices = async () => {
+    if (!user) return;
+    
+    try {
+      const data = await invoiceService.getAllInvoices();
+      setInvoices(data);
+    } catch (error: any) {
+      toast.error("Failed to fetch invoices");
+      console.error(error);
+    }
   };
 
-  const updateInvoice = (id: string, invoiceData: Partial<Invoice>) => {
-    setInvoices(prev => 
-      prev.map(invoice => 
-        invoice.id === id ? { ...invoice, ...invoiceData } : invoice
-      )
-    );
-    toast.success("Invoice updated successfully!");
+  const createInvoice = async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
+    try {
+      const newInvoice = await invoiceService.createInvoice(invoiceData);
+      
+      setInvoices(prev => [...prev, newInvoice]);
+      toast.success("Invoice created successfully!");
+      return newInvoice;
+    } catch (error: any) {
+      toast.error("Failed to create invoice");
+      console.error(error);
+      throw error;
+    }
   };
 
-  const getInvoice = (id: string) => {
-    return invoices.find(invoice => invoice.id === id);
+  const updateInvoice = async (id: string, invoiceData: Partial<Invoice>) => {
+    try {
+      const updatedInvoice = await invoiceService.updateInvoice(id, invoiceData);
+      
+      setInvoices(prev => 
+        prev.map(invoice => 
+          invoice.id === id ? { ...invoice, ...updatedInvoice } : invoice
+        )
+      );
+      toast.success("Invoice updated successfully!");
+    } catch (error: any) {
+      toast.error("Failed to update invoice");
+      console.error(error);
+      throw error;
+    }
+  };
+
+  const getInvoice = async (id: string) => {
+    try {
+      // First check if we have it in state
+      const localInvoice = invoices.find(invoice => invoice.id === id);
+      
+      if (localInvoice) {
+        return localInvoice;
+      }
+      
+      // If not in state, fetch from API
+      const fetchedInvoice = await invoiceService.getInvoiceById(id);
+      return fetchedInvoice;
+    } catch (error) {
+      toast.error("Failed to get invoice");
+      console.error(error);
+      return undefined;
+    }
   };
 
   const generateInvoiceNumber = () => {
