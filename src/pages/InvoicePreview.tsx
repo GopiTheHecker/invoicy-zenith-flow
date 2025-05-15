@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,22 +9,34 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 const InvoicePreview = () => {
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
   const { id } = useParams<{ id: string }>();
+  const { getInvoice, currentInvoice, updateInvoice } = useInvoices();
   const navigate = useNavigate();
-  const { getInvoice } = useInvoices();
-  const [invoice, setInvoice] = useState<Invoice | undefined>(undefined);
 
   useEffect(() => {
-    if (id) {
-      const foundInvoice = getInvoice(id);
-      if (foundInvoice) {
-        setInvoice(foundInvoice);
-      } else {
-        navigate("/dashboard");
-        toast.error("Invoice not found");
+    const fetchInvoice = async () => {
+      try {
+        if (id) {
+          // If we have a currentInvoice and its id matches the URL param, use that
+          if (currentInvoice && currentInvoice.id === id) {
+            setInvoice(currentInvoice);
+          } else {
+            // Otherwise fetch from API
+            const invoiceData = await getInvoice(id);
+            if (invoiceData) {
+              setInvoice(invoiceData);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching invoice:", error);
+        toast.error("Failed to load invoice");
       }
-    }
-  }, [id, getInvoice, navigate]);
+    };
+
+    fetchInvoice();
+  }, [id, currentInvoice, getInvoice]);
 
   const handleDownloadPDF = async () => {
     const element = document.getElementById('invoice-pdf');
