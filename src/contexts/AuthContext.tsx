@@ -37,7 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (error) {
+          // Handle potential JSON parse error
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+        }
       }
     }
     setIsLoading(false);
@@ -49,6 +55,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const response = await authService.login({ email, password });
       
+      if (!response || !response._id) {
+        throw new Error("Invalid response from server");
+      }
+      
       // Save to state and localStorage
       const userData: User = {
         id: response._id,
@@ -56,13 +66,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: response.name
       };
       
-      setUser(userData);
+      // First update localStorage to ensure data is persisted
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('token', response.token);
+      
+      // Then update state
+      setUser(userData);
       
       toast.success("Logged in successfully!");
       return true;
     } catch (error: any) {
+      console.error("Login error:", error);
       const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
       toast.error(errorMessage);
       return false;
@@ -77,6 +91,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const response = await authService.register({ name, email, password });
       
+      if (!response || !response._id) {
+        throw new Error("Invalid response from server");
+      }
+      
       // Save to state and localStorage
       const userData: User = {
         id: response._id,
@@ -84,13 +102,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: response.name
       };
       
-      setUser(userData);
+      // First update localStorage to ensure data is persisted
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('token', response.token);
+      
+      // Then update state
+      setUser(userData);
       
       toast.success("Account created successfully!");
       return true;
     } catch (error: any) {
+      console.error("Registration error:", error);
       const errorMessage = error.response?.data?.message || "Registration failed. Please try again.";
       toast.error(errorMessage);
       return false;

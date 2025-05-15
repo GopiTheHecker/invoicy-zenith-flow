@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, User, Mail, Lock } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 const Login = () => {
   // Login form state
@@ -43,7 +42,10 @@ const Login = () => {
     try {
       const success = await login(email, password);
       if (success) {
-        navigate(from, { replace: true });
+        // Add a small delay to ensure state updates before navigation
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 100);
       }
     } finally {
       setIsSubmitting(false);
@@ -54,11 +56,7 @@ const Login = () => {
     e.preventDefault();
     
     if (registerPassword !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords don't match",
-        variant: "destructive"
-      });
+      toast.error("Passwords don't match");
       return;
     }
     
@@ -67,7 +65,10 @@ const Login = () => {
     try {
       const success = await register(registerName, registerEmail, registerPassword);
       if (success) {
-        navigate(from, { replace: true });
+        // Add a small delay to ensure state updates before navigation
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 100);
       }
     } finally {
       setIsSubmitting(false);
