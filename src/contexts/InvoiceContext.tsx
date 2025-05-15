@@ -169,7 +169,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
     if (num === 0) return 'Zero Rupees Only';
     
-    const intNum = Math.floor(num);
+    let intNum = Math.floor(num);
     const paise = Math.round((num - intNum) * 100);
     
     let result = '';
