@@ -49,7 +49,10 @@ router.post('/register', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ 
+      message: error.message || 'Registration failed',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
   }
 });
 
@@ -95,7 +98,10 @@ router.post('/login', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      message: error.message || 'Login failed',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
   }
 });
 
@@ -111,7 +117,10 @@ router.get('/profile', authMiddleware, async (req, res) => {
     res.json(user);
   } catch (error: any) {
     console.error('Profile error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      message: error.message || 'Failed to get user profile',
+      error: process.env.NODE_ENV === 'development' ? error : undefined  
+    });
   }
 });
 

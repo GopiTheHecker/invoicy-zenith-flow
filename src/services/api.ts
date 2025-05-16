@@ -1,11 +1,13 @@
 
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+// Use window.location.hostname to determine if we're in development or production
+const isDevelopment = window.location.hostname === 'localhost';
+const BASE_URL = isDevelopment ? 'http://localhost:5000/api' : 'https://invoice-app-api.onrender.com/api';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,7 +38,8 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('API Response Error:', error.response?.status, error.response?.data || error.message);
+    const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';
+    console.error('API Response Error:', error.response?.status, errorMessage);
     return Promise.reject(error);
   }
 );

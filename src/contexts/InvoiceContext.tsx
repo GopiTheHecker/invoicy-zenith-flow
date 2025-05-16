@@ -59,6 +59,7 @@ type InvoiceContextType = {
   setCurrentInvoice: (invoice: Invoice | null) => void;
   createInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<Invoice>;
   updateInvoice: (id: string, invoice: Partial<Invoice>) => Promise<void>;
+  deleteInvoice: (id: string) => Promise<boolean>;
   getInvoice: (id: string) => Promise<Invoice | undefined>;
   generateInvoiceNumber: () => string;
   calculateInvoiceValues: (items: InvoiceItem[], discount: number, sameState: boolean) => { 
@@ -105,7 +106,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const data = await invoiceService.getAllInvoices();
       setInvoices(data);
     } catch (error: any) {
-      toast.error("Failed to fetch invoices");
+      toast("Failed to fetch invoices");
       console.error(error);
     }
   };
@@ -115,10 +116,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const newInvoice = await invoiceService.createInvoice(invoiceData);
       
       setInvoices(prev => [...prev, newInvoice]);
-      toast.success("Invoice created successfully!");
+      toast("Invoice created successfully!");
       return newInvoice;
     } catch (error: any) {
-      toast.error("Failed to create invoice");
+      toast("Failed to create invoice");
       console.error(error);
       throw error;
     }
@@ -133,11 +134,33 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           invoice.id === id ? { ...invoice, ...updatedInvoice } : invoice
         )
       );
-      toast.success("Invoice updated successfully!");
+      toast("Invoice updated successfully!");
     } catch (error: any) {
-      toast.error("Failed to update invoice");
+      toast("Failed to update invoice");
       console.error(error);
       throw error;
+    }
+  };
+
+  // Add delete invoice functionality
+  const deleteInvoice = async (id: string) => {
+    try {
+      await invoiceService.deleteInvoice(id);
+      
+      // Update state to remove the deleted invoice
+      setInvoices(prev => prev.filter(invoice => invoice.id !== id));
+      
+      // If the deleted invoice is the current one, clear it
+      if (currentInvoice?.id === id) {
+        setCurrentInvoice(null);
+      }
+      
+      toast("Invoice deleted successfully!");
+      return true;
+    } catch (error: any) {
+      toast("Failed to delete invoice");
+      console.error(error);
+      return false;
     }
   };
 
@@ -154,7 +177,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const fetchedInvoice = await invoiceService.getInvoiceById(id);
       return fetchedInvoice;
     } catch (error) {
-      toast.error("Failed to get invoice");
+      toast("Failed to get invoice");
       console.error(error);
       return undefined;
     }
@@ -288,7 +311,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       currentInvoice, 
       setCurrentInvoice, 
       createInvoice, 
-      updateInvoice, 
+      updateInvoice,
+      deleteInvoice, 
       getInvoice,
       generateInvoiceNumber,
       calculateInvoiceValues
