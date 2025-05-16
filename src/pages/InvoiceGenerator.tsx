@@ -76,19 +76,11 @@ const InvoiceGenerator = () => {
         setTerms(invoice.terms);
         setLogo(invoice.logo);
       } else {
-        toast({
-          title: "Error",
-          description: "Invoice not found",
-          variant: "destructive"
-        });
+        toast("Error: Invoice not found");
       }
     } catch (error) {
       console.error('Error fetching invoice:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch invoice",
-        variant: "destructive"
-      });
+      toast("Error: Failed to fetch invoice");
     }
   };
 
@@ -188,11 +180,7 @@ const InvoiceGenerator = () => {
       navigate(`/invoice/${newInvoice.id}/preview`);
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save invoice",
-        variant: "destructive"
-      });
+      toast("Error: Failed to save invoice");
     }
   };
 
