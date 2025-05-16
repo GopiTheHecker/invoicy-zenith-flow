@@ -9,14 +9,14 @@ const BASE_URL = isDevelopment
   ? 'http://localhost:5000/api' 
   : 'https://invoice-app-api.onrender.com/api';
 
-// Create axios instance
+// Create axios instance with configured base URL
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  // Increase timeout for slower connections
-  timeout: 30000, // Increased from 10000 to 30000 ms
+  // Increase timeout for slower connections or server startup
+  timeout: 60000, // Increased from 30000 to 60000 ms
 });
 
 // Add a request interceptor to include token in requests
@@ -42,6 +42,11 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (!error.response) {
+      console.error('Network Error - Cannot connect to API server:', error.message);
+      return Promise.reject(new Error('Cannot connect to the server. Please check your internet connection or try again later.'));
+    }
+    
     if (error.code === 'ECONNABORTED') {
       console.error('API Request Timeout:', error.message);
       return Promise.reject(new Error('Request timeout. Please check your internet connection and try again.'));

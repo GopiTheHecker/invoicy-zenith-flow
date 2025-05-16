@@ -53,6 +53,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
+      // Special handling for guest login
+      if (email === 'guest@example.com' && password === 'guest123') {
+        // Create guest user data without backend call
+        const guestUserData: User = {
+          id: 'guest-user-id',
+          email: 'guest@example.com',
+          name: 'Guest User'
+        };
+        
+        // Set to localStorage
+        localStorage.setItem('user', JSON.stringify(guestUserData));
+        localStorage.setItem('token', 'guest-token');
+        
+        // Update state
+        setUser(guestUserData);
+        
+        toast.success("Logged in as Guest");
+        return true;
+      }
+      
+      // Regular login flow
       const response = await authService.login({ email, password });
       
       if (!response || !response._id) {
@@ -77,7 +98,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (error: any) {
       console.error("Login error:", error);
-      const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
+      const errorMessage = 
+        error.response?.data?.message || 
+        (error.message === 'Network Error' ? 
+          'Cannot connect to server. Please try again later.' : 
+          "Login failed. Please check your credentials and try again.");
       toast.error(errorMessage);
       return false;
     } finally {
@@ -113,7 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (error: any) {
       console.error("Registration error:", error);
-      const errorMessage = error.response?.data?.message || "Registration failed. Please try again.";
+      const errorMessage = 
+        error.response?.data?.message || 
+        (error.message === 'Network Error' ? 
+          'Cannot connect to server. Please try again later.' : 
+          "Registration failed. Please try again.");
       toast.error(errorMessage);
       return false;
     } finally {

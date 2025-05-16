@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -74,6 +75,20 @@ const Login = () => {
       setIsSubmitting(false);
     }
   };
+  
+  const handleGuestLogin = () => {
+    setIsSubmitting(true);
+    // Use predefined guest credentials
+    login("guest@example.com", "guest123").then(success => {
+      if (success) {
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 100);
+      }
+    }).finally(() => {
+      setIsSubmitting(false);
+    });
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -133,13 +148,30 @@ const Login = () => {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col">
+              <CardFooter className="flex flex-col gap-3">
                 <Button 
                   type="submit" 
                   className="w-full bg-primary hover:bg-primary-300" 
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Logging in..." : "Log in"}
+                </Button>
+                <div className="relative w-full">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t"></span>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleGuestLogin}
+                  disabled={isSubmitting}
+                >
+                  Continue as Guest
                 </Button>
               </CardFooter>
             </form>

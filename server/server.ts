@@ -12,17 +12,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://vichusci:GOPIVAII@cluster0.epz6g.mongodb.net/invoice-app';
 
-// Middleware
+// Middleware - Expanded CORS settings to ensure frontend connection works
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'https://invoice-app-client.onrender.com'],
-  credentials: true
+  origin: '*', // Allow all origins for development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
 // Add logging middleware for debugging requests
 app.use((req, res, next) => {
   const start = Date.now();
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Request started`);
+  console.log('Request Headers:', req.headers);
   
   res.on('finish', () => {
     const duration = Date.now() - start;
@@ -30,6 +34,11 @@ app.use((req, res, next) => {
   });
   
   next();
+});
+
+// Simple health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
 // Routes

@@ -35,24 +35,41 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create new user
-    const user = await User.create({
-      name,
-      email,
-      password
-    });
+    // Create new user with improved error handling
+    try {
+      const user = await User.create({
+        name,
+        email,
+        password
+      });
 
-    console.log('User created successfully with ID:', user._id);
+      console.log('User created successfully with ID:', user._id);
 
-    // Generate JWT token
-    const token = generateToken(user._id.toString(), user.email);
+      // Generate JWT token
+      const token = generateToken(user._id.toString(), user.email);
 
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token
-    });
+      res.status(201).json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        token
+      });
+    } catch (dbError: any) {
+      console.error('Database error during user creation:', dbError);
+      
+      // Check for validation errors
+      if (dbError.name === 'ValidationError') {
+        const validationErrors = Object.values(dbError.errors).map((err: any) => err.message);
+        return res.status(400).json({ message: 'Validation error', errors: validationErrors });
+      }
+      
+      // Check for duplicate key errors
+      if (dbError.code === 11000) {
+        return res.status(400).json({ message: 'This email is already in use' });
+      }
+      
+      throw dbError;
+    }
   } catch (error: any) {
     console.error('Registration error:', error);
     return res.status(500).json({ 
