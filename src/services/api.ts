@@ -3,7 +3,11 @@ import axios from 'axios';
 
 // Use window.location.hostname to determine if we're in development or production
 const isDevelopment = window.location.hostname === 'localhost';
-const BASE_URL = isDevelopment ? 'http://localhost:5000/api' : 'https://invoice-app-api.onrender.com/api';
+
+// Set BASE_URL based on environment
+const BASE_URL = isDevelopment 
+  ? 'http://localhost:5000/api' 
+  : 'https://invoice-app-api.onrender.com/api';
 
 // Create axios instance
 const api = axios.create({
@@ -11,8 +15,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Add timeout to prevent hanging requests
-  timeout: 10000,
+  // Increase timeout for slower connections
+  timeout: 30000, // Increased from 10000 to 30000 ms
 });
 
 // Add a request interceptor to include token in requests
@@ -38,6 +42,11 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (error.code === 'ECONNABORTED') {
+      console.error('API Request Timeout:', error.message);
+      return Promise.reject(new Error('Request timeout. Please check your internet connection and try again.'));
+    }
+    
     const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';
     console.error('API Response Error:', error.response?.status, errorMessage);
     return Promise.reject(error);

@@ -6,6 +6,16 @@ import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const TOKEN_EXPIRY = '30d';
+
+// Helper function to generate JWT token
+const generateToken = (userId: string, email: string) => {
+  return jwt.sign(
+    { id: userId, email },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRY }
+  );
+};
 
 // Register a new user
 router.post('/register', async (req, res) => {
@@ -35,11 +45,7 @@ router.post('/register', async (req, res) => {
     console.log('User created successfully with ID:', user._id);
 
     // Generate JWT token
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '30d' }
-    );
+    const token = generateToken(user._id.toString(), user.email);
 
     res.status(201).json({
       _id: user._id,
@@ -84,11 +90,7 @@ router.post('/login', async (req, res) => {
     console.log('User logged in successfully:', user._id);
 
     // Generate JWT token
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '30d' }
-    );
+    const token = generateToken(user._id.toString(), user.email);
 
     res.json({
       _id: user._id,
