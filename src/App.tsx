@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import InvoiceGenerator from "./pages/InvoiceGenerator";
 import InvoicePreview from "./pages/InvoicePreview";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import MainLayout from "./components/layouts/MainLayout";
 import RequireAuth from "./components/auth/RequireAuth";
@@ -40,6 +41,7 @@ const App = () => (
                   <Route path="/invoice/new" element={<InvoiceGenerator />} />
                   <Route path="/invoice/edit/:id" element={<InvoiceGenerator />} />
                   <Route path="/invoice/preview/:id" element={<InvoicePreview />} />
+                  <Route path="/profile" element={<Profile />} />
                 </Route>
               </Route>
               

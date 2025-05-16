@@ -7,6 +7,12 @@ type User = {
   id: string;
   email: string;
   name: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
 };
 
 type AuthContextType = {
@@ -15,6 +21,7 @@ type AuthContextType = {
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
+  updateUserProfile: (data: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,7 +66,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const guestUserData: User = {
           id: 'guest-user-id',
           email: 'guest@example.com',
-          name: 'Guest User'
+          name: 'Guest User',
+          bankDetails: {
+            accountName: 'Guest User',
+            accountNumber: '1234567890',
+            ifscCode: 'GUEST001',
+            bankName: 'Guest Bank'
+          }
         };
         
         // Set to localStorage
@@ -84,7 +97,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData: User = {
         id: response._id,
         email: response.email,
-        name: response.name
+        name: response.name,
+        bankDetails: response.bankDetails
       };
       
       // First update localStorage to ensure data is persisted
@@ -157,8 +171,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.info("Logged out successfully");
   };
 
+  // Add function to update user profile including bank details
+  const updateUserProfile = (data: Partial<User>) => {
+    if (!user) return;
+    
+    const updatedUser = { ...user, ...data };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    toast.success("Profile updated successfully");
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

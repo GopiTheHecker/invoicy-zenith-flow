@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
 import { invoiceService } from '@/services/invoiceService';
@@ -72,6 +71,12 @@ type InvoiceContextType = {
     roundedTotal: number,
     amountInWords: string 
   };
+  getUserBankDetails: () => {
+    accountName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  } | undefined;
 };
 
 const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
@@ -103,23 +108,51 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!user) return;
     
     try {
+      // For guest users, check localStorage
+      if (user.id === 'guest-user-id') {
+        const storedInvoices = localStorage.getItem('guestInvoices');
+        if (storedInvoices) {
+          setInvoices(JSON.parse(storedInvoices));
+        }
+        return;
+      }
+      
+      // For regular users, fetch from API
       const data = await invoiceService.getAllInvoices();
       setInvoices(data);
     } catch (error: any) {
-      toast("Failed to fetch invoices");
+      toast.error("Failed to fetch invoices");
       console.error(error);
     }
   };
 
   const createInvoice = async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
     try {
+      // For guest users, store in localStorage
+      if (user?.id === 'guest-user-id') {
+        const newId = `guest-invoice-${Date.now()}`;
+        const newInvoice = {
+          ...invoiceData,
+          id: newId,
+          createdAt: new Date().toISOString()
+        };
+        
+        const updatedInvoices = [...invoices, newInvoice];
+        setInvoices(updatedInvoices);
+        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
+        
+        toast.success("Invoice created successfully!");
+        return newInvoice;
+      }
+      
+      // For regular users
       const newInvoice = await invoiceService.createInvoice(invoiceData);
       
       setInvoices(prev => [...prev, newInvoice]);
-      toast("Invoice created successfully!");
+      toast.success("Invoice created successfully!");
       return newInvoice;
     } catch (error: any) {
-      toast("Failed to create invoice");
+      toast.error("Failed to create invoice");
       console.error(error);
       throw error;
     }
@@ -127,6 +160,19 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateInvoice = async (id: string, invoiceData: Partial<Invoice>) => {
     try {
+      // For guest users, update in localStorage
+      if (user?.id === 'guest-user-id') {
+        const updatedInvoices = invoices.map(invoice => 
+          invoice.id === id ? { ...invoice, ...invoiceData } : invoice
+        );
+        
+        setInvoices(updatedInvoices);
+        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
+        toast.success("Invoice updated successfully!");
+        return;
+      }
+      
+      // For regular users
       const updatedInvoice = await invoiceService.updateInvoice(id, invoiceData);
       
       setInvoices(prev => 
@@ -134,9 +180,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           invoice.id === id ? { ...invoice, ...updatedInvoice } : invoice
         )
       );
-      toast("Invoice updated successfully!");
+      toast.success("Invoice updated successfully!");
     } catch (error: any) {
-      toast("Failed to update invoice");
+      toast.error("Failed to update invoice");
       console.error(error);
       throw error;
     }
@@ -145,6 +191,22 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Add delete invoice functionality
   const deleteInvoice = async (id: string) => {
     try {
+      // For guest users, delete from localStorage
+      if (user?.id === 'guest-user-id') {
+        const updatedInvoices = invoices.filter(invoice => invoice.id !== id);
+        setInvoices(updatedInvoices);
+        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
+        
+        // If the deleted invoice is the current one, clear it
+        if (currentInvoice?.id === id) {
+          setCurrentInvoice(null);
+        }
+        
+        toast.success("Invoice deleted successfully!");
+        return true;
+      }
+      
+      // For regular users
       await invoiceService.deleteInvoice(id);
       
       // Update state to remove the deleted invoice
@@ -155,10 +217,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCurrentInvoice(null);
       }
       
-      toast("Invoice deleted successfully!");
+      toast.success("Invoice deleted successfully!");
       return true;
     } catch (error: any) {
-      toast("Failed to delete invoice");
+      toast.error("Failed to delete invoice");
       console.error(error);
       return false;
     }
@@ -173,14 +235,33 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return localInvoice;
       }
       
+      // For guest users, we've already checked localStorage via the invoices state
+      if (user?.id === 'guest-user-id') {
+        return undefined;
+      }
+      
       // If not in state, fetch from API
       const fetchedInvoice = await invoiceService.getInvoiceById(id);
       return fetchedInvoice;
     } catch (error) {
-      toast("Failed to get invoice");
+      toast.error("Failed to get invoice");
       console.error(error);
       return undefined;
     }
+  };
+
+  // Function to get the user's bank details
+  const getUserBankDetails = () => {
+    if (!user || !user.bankDetails) {
+      return {
+        accountName: user?.name || '',
+        accountNumber: 'XXXXXXXXXXXX',
+        ifscCode: 'XXXXXXXXXXXX',
+        bankName: 'XXXX Bank'
+      };
+    }
+    
+    return user.bankDetails;
   };
 
   const generateInvoiceNumber = () => {
@@ -315,7 +396,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteInvoice, 
       getInvoice,
       generateInvoiceNumber,
-      calculateInvoiceValues
+      calculateInvoiceValues,
+      getUserBankDetails
     }}>
       {children}
     </InvoiceContext.Provider>

@@ -93,7 +93,7 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 flex flex-col items-center">
+        <CardHeader className="space-y-2 flex flex-col items-center">
           <div className="bg-primary-50 p-3 rounded-full mb-2">
             <FileText className="h-8 w-8 text-primary" />
           </div>
@@ -148,7 +148,7 @@ const Login = () => {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col gap-3">
+              <CardFooter className="flex flex-col gap-4 px-6 pb-6 pt-2">
                 <Button 
                   type="submit" 
                   className="w-full bg-primary hover:bg-primary-300" 
@@ -243,7 +243,7 @@ const Login = () => {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col">
+              <CardFooter className="flex flex-col px-6 pb-6 pt-2">
                 <Button 
                   type="submit" 
                   className="w-full bg-primary hover:bg-primary-300" 

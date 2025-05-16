@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,9 @@ import jsPDF from "jspdf";
 const InvoicePreview = () => {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const { id } = useParams<{ id: string }>();
-  const { getInvoice, currentInvoice, updateInvoice } = useInvoices();
+  const { getInvoice, currentInvoice, updateInvoice, getUserBankDetails } = useInvoices();
   const navigate = useNavigate();
+  const bankDetails = getUserBankDetails();
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -83,7 +85,7 @@ const InvoicePreview = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
@@ -300,10 +302,10 @@ const InvoicePreview = () => {
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="border p-4 rounded">
               <h3 className="text-gray-700 font-semibold mb-2">Bank Details</h3>
-              <p className="text-sm">Account Name: {invoice.company.name}</p>
-              <p className="text-sm">Account Number: XXXXXXXXXXXX</p>
-              <p className="text-sm">IFSC Code: XXXXXXXXXXXX</p>
-              <p className="text-sm">Bank Name: XXXX Bank</p>
+              <p className="text-sm">Account Name: {bankDetails?.accountName || invoice.company.name}</p>
+              <p className="text-sm">Account Number: {bankDetails?.accountNumber || 'XXXXXXXXXXXX'}</p>
+              <p className="text-sm">IFSC Code: {bankDetails?.ifscCode || 'XXXXXXXXXXXX'}</p>
+              <p className="text-sm">Bank Name: {bankDetails?.bankName || 'XXXX Bank'}</p>
             </div>
             
             <div className="border p-4 rounded">

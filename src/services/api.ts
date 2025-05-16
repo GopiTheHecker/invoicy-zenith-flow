@@ -4,10 +4,10 @@ import axios from 'axios';
 // Use window.location.hostname to determine if we're in development or production
 const isDevelopment = window.location.hostname === 'localhost';
 
-// Set BASE_URL based on environment
+// Set BASE_URL based on environment - using the Lovable preview URL pattern when not in development
 const BASE_URL = isDevelopment 
   ? 'http://localhost:5000/api' 
-  : 'https://invoice-app-api.onrender.com/api';
+  : '/api'; // Changed to relative path to work in the Lovable preview environment
 
 // Create axios instance with configured base URL
 const api = axios.create({
@@ -15,8 +15,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Increase timeout for slower connections or server startup
-  timeout: 60000, // Increased from 30000 to 60000 ms
+  // Increased timeout for slower connections
+  timeout: 120000, // Further increased from 60000 to 120000 ms for Lovable environment
 });
 
 // Add a request interceptor to include token in requests

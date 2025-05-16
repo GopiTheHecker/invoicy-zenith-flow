@@ -14,13 +14,13 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://vichusci:GOPIVAII@
 
 // Middleware - Expanded CORS settings to ensure frontend connection works
 app.use(cors({
-  origin: '*', // Allow all origins for development
+  origin: '*', // Allow all origins for development and preview environments
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for larger payloads like images
 
 // Add logging middleware for debugging requests
 app.use((req, res, next) => {
@@ -41,6 +41,16 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
+// Add API status check endpoint
+app.get('/api/status', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'API is running',
+    timestamp: new Date().toISOString(),
+    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
 // Routes
 app.use('/api/users', userRouter);
 app.use('/api/invoices', invoiceRouter);
@@ -58,7 +68,12 @@ mongoose.connect(MONGODB_URI)
   })
   .catch((error) => {
     console.error('MongoDB connection error:', error);
-    process.exit(1); // Exit with failure code
+    console.log('Starting server anyway to allow frontend development with localStorage');
+    
+    // Start server even without DB connection to allow frontend development
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT} (without DB connection)`);
+    });
   });
 
 // Global error handler
@@ -73,7 +88,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  process.exit(1);
+  // Don't exit the process in development
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
 });
 
 // Handle unhandled promise rejections
