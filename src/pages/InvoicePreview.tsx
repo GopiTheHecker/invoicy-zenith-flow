@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,13 +7,15 @@ import { ArrowLeft, Download, Mail, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 const InvoicePreview = () => {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const { id } = useParams<{ id: string }>();
   const { getInvoice, currentInvoice, updateInvoice, getUserBankDetails } = useInvoices();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const bankDetails = getUserBankDetails();
+  const bankDetails = user?.bankDetails || getUserBankDetails();
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -47,6 +50,8 @@ const InvoicePreview = () => {
     if (!element) return;
 
     try {
+      toast.info("Generating PDF...");
+      
       const canvas = await html2canvas(element);
       const imgData = canvas.toDataURL('image/png');
       
@@ -136,7 +141,6 @@ const InvoicePreview = () => {
           </Button>
           <Button 
             onClick={handleDownloadPDF}
-            className="bg-primary hover:bg-primary-300"
           >
             <Download className="h-4 w-4 mr-2" />
             Download PDF
@@ -323,10 +327,10 @@ const InvoicePreview = () => {
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="border p-4 rounded">
               <h3 className="text-gray-700 font-semibold mb-2">Bank Details</h3>
-              <p className="text-sm">Account Name: {bankDetails?.accountName || invoice.company.name}</p>
-              <p className="text-sm">Account Number: {bankDetails?.accountNumber || 'XXXXXXXXXXXX'}</p>
-              <p className="text-sm">IFSC Code: {bankDetails?.ifscCode || 'XXXXXXXXXXXX'}</p>
-              <p className="text-sm">Bank Name: {bankDetails?.bankName || 'XXXX Bank'}</p>
+              <p className="text-sm">Account Name: {bankDetails?.accountName || "Not specified"}</p>
+              <p className="text-sm">Account Number: {bankDetails?.accountNumber || "Not specified"}</p>
+              <p className="text-sm">IFSC Code: {bankDetails?.ifscCode || "Not specified"}</p>
+              <p className="text-sm">Bank Name: {bankDetails?.bankName || "Not specified"}</p>
             </div>
             
             <div className="border p-4 rounded">

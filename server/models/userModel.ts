@@ -6,6 +6,12 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -24,6 +30,12 @@ const userSchema = new Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: 6
+  },
+  bankDetails: {
+    accountName: String,
+    accountNumber: String,
+    ifscCode: String,
+    bankName: String
   }
 }, { timestamps: true });
 

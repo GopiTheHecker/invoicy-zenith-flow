@@ -1,157 +1,132 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/AuthContext';
 
 const Profile = () => {
-  const { user, updateUserProfile } = useAuth();
+  const { user, updateUserProfile, updateBankDetails, logout } = useAuth();
   
-  const [accountName, setAccountName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [ifscCode, setIfscCode] = useState("");
-  const [bankName, setBankName] = useState("");
+  const [accountName, setAccountName] = useState(user?.bankDetails?.accountName || '');
+  const [accountNumber, setAccountNumber] = useState(user?.bankDetails?.accountNumber || '');
+  const [ifscCode, setIfscCode] = useState(user?.bankDetails?.ifscCode || '');
+  const [bankName, setBankName] = useState(user?.bankDetails?.bankName || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Load existing bank details if available
-  useEffect(() => {
-    if (user?.bankDetails) {
-      setAccountName(user.bankDetails.accountName || "");
-      setAccountNumber(user.bankDetails.accountNumber || "");
-      setIfscCode(user.bankDetails.ifscCode || "");
-      setBankName(user.bankDetails.bankName || "");
-    } else if (user) {
-      // Set account name to user's name by default
-      setAccountName(user.name);
-    }
-  }, [user]);
-  
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleBankDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      updateUserProfile({
-        bankDetails: {
-          accountName,
-          accountNumber,
-          ifscCode,
-          bankName
-        }
-      });
+      // Validate inputs
+      if (!accountName || !accountNumber || !ifscCode || !bankName) {
+        toast.error("All bank details are required");
+        return;
+      }
       
-      toast.success("Bank details updated successfully!");
+      const bankDetails = {
+        accountName,
+        accountNumber,
+        ifscCode,
+        bankName
+      };
+      
+      const success = await updateBankDetails(bankDetails);
+      
+      if (success) {
+        toast.success("Bank details updated successfully");
+      }
     } catch (error) {
+      console.error("Error updating bank details:", error);
       toast.error("Failed to update bank details");
-      console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  if (!user) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <p>Please log in to view your profile</p>
-      </div>
-    );
-  }
-  
+
   return (
-    <div className="container mx-auto py-8 max-w-3xl">
-      <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Profile</h1>
       
-      <div className="space-y-8">
-        {/* User Information Card */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* User Profile */}
         <Card>
           <CardHeader>
-            <CardTitle>User Information</CardTitle>
+            <CardTitle>Your Profile</CardTitle>
+            <CardDescription>View and manage your account information</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div>
-                <Label>Name</Label>
-                <p className="text-gray-700 font-medium mt-1">{user.name}</p>
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" value={user?.name || ''} readOnly />
               </div>
               <div>
-                <Label>Email</Label>
-                <p className="text-gray-700 font-medium mt-1">{user.email}</p>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" value={user?.email || ''} readOnly />
               </div>
-              {user.id === 'guest-user-id' && (
-                <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-md mt-2">
-                  <p className="text-yellow-800 text-sm">
-                    You are using a guest account. Your data will be stored locally and may be lost when you clear your browser data.
-                  </p>
+              {user?.id === 'guest-user-id' && (
+                <div className="text-sm text-amber-500">
+                  You are using the app in guest mode. Some features may be limited.
                 </div>
               )}
             </div>
           </CardContent>
+          <CardFooter>
+            <Button variant="outline" onClick={logout}>Sign Out</Button>
+          </CardFooter>
         </Card>
         
-        {/* Bank Details Card */}
+        {/* Bank Details */}
         <Card>
           <CardHeader>
-            <CardTitle>Bank Account Details</CardTitle>
+            <CardTitle>Bank Details</CardTitle>
+            <CardDescription>Manage your bank information for invoices</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600 mb-4">These details will appear on your invoices. They are stored securely.</p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accountName">Account Holder Name</Label>
-                <Input
-                  id="accountName"
+            <form onSubmit={handleBankDetailsSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="accountName">Account Name</Label>
+                <Input 
+                  id="accountName" 
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
                   placeholder="Enter account holder name"
-                  required
                 />
               </div>
-              
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="accountNumber">Account Number</Label>
-                <Input
-                  id="accountNumber"
+                <Input 
+                  id="accountNumber" 
                   value={accountNumber}
                   onChange={(e) => setAccountNumber(e.target.value)}
                   placeholder="Enter account number"
-                  required
                 />
               </div>
-              
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="ifscCode">IFSC Code</Label>
-                <Input
-                  id="ifscCode"
+                <Input 
+                  id="ifscCode" 
                   value={ifscCode}
                   onChange={(e) => setIfscCode(e.target.value)}
                   placeholder="Enter IFSC code"
-                  required
                 />
               </div>
-              
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="bankName">Bank Name</Label>
-                <Input
-                  id="bankName"
+                <Input 
+                  id="bankName" 
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   placeholder="Enter bank name"
-                  required
                 />
               </div>
-              
-              <CardFooter className="p-0 pt-4">
-                <Button 
-                  type="submit" 
-                  className="w-full bg-primary hover:bg-primary-300" 
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Saving..." : "Save Bank Details"}
-                </Button>
-              </CardFooter>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Updating...' : 'Save Bank Details'}
+              </Button>
             </form>
           </CardContent>
         </Card>

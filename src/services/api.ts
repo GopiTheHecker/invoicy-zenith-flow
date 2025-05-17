@@ -17,7 +17,7 @@ const api = axios.create({
     'Accept': 'application/json',
   },
   // Increased timeout for slower connections
-  timeout: 120000, // 120 seconds
+  timeout: 30000, // 30 seconds
 });
 
 // Add a request interceptor to include token in requests
@@ -53,7 +53,8 @@ api.interceptors.response.use(
   (error) => {
     if (!error.response) {
       console.error('Network Error - Cannot connect to API server:', error.message);
-      return Promise.reject(new Error('Cannot connect to the server. Please check your internet connection or try again later.'));
+      // Use guest mode if API server is unavailable
+      return Promise.reject(new Error('Cannot connect to the server. Using guest mode.'));
     }
     
     if (error.code === 'ECONNABORTED') {

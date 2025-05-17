@@ -20,7 +20,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '10mb' })); // Increased limit for larger payloads like images
+// Increase JSON limit for base64 encoded images
+app.use(express.json({ limit: '10mb' })); 
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Add Content-Type response header to ensure proper JSON responses
+app.use((req, res, next) => {
+  res.header('Content-Type', 'application/json');
+  next();
+});
 
 // Add logging middleware for debugging requests
 app.use((req, res, next) => {
@@ -28,28 +36,46 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Request started`);
   console.log('Request Headers:', req.headers);
   
-  res.on('finish', () => {
+  // Capture and log response
+  const originalSend = res.send;
+  res.send = function(body) {
     const duration = Date.now() - start;
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Response status: ${res.statusCode} - Duration: ${duration}ms`);
-  });
+    
+    // Log response body only if it's not too large
+    if (body && typeof body === 'string' && body.length < 1000) {
+      console.log('Response body:', body);
+    } else {
+      console.log('Response body: [Large response, not logged]');
+    }
+    
+    return originalSend.call(this, body);
+  };
   
   next();
 });
 
+// Wrap all route handlers in try-catch to prevent HTML error responses
+const wrapAsync = (fn) => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
 // Simple health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', wrapAsync(async (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
-});
+}));
 
 // Add API status check endpoint
-app.get('/api/status', (req, res) => {
+app.get('/api/status', wrapAsync(async (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     message: 'API is running',
     timestamp: new Date().toISOString(),
     dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
-});
+}));
 
 // Routes
 app.use('/api/users', userRouter);
@@ -76,9 +102,11 @@ mongoose.connect(MONGODB_URI)
     });
   });
 
-// Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+// Global error handler - Always return JSON responses
+app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
+  
+  // Ensure response is always JSON
   res.status(500).json({ 
     message: 'Something went wrong on the server',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined

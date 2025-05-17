@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInvoices } from '@/contexts/InvoiceContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Upload } from "lucide-react";
 import { Invoice, InvoiceItem } from '@/contexts/InvoiceContext';
 
 const InvoiceGenerator = () => {
@@ -43,6 +45,14 @@ const InvoiceGenerator = () => {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [logo, setLogo] = useState<string | undefined>(undefined);
+  const [logoPreview, setLogoPreview] = useState<string | undefined>(undefined);
+  const [showBankDetails, setShowBankDetails] = useState(false);
+  const [bankDetails, setBankDetails] = useState({
+    accountName: '',
+    accountNumber: '',
+    ifscCode: '',
+    bankName: ''
+  });
   const { user } = useAuth();
   const { createInvoice, updateInvoice, getInvoice, generateInvoiceNumber, calculateInvoiceValues, setCurrentInvoice } = useInvoices();
   const navigate = useNavigate();
@@ -65,12 +75,23 @@ const InvoiceGenerator = () => {
     setPaymentTerms('Net 30 days');
   }, []);
 
+  // Set invoice number and fill bank details from user profile
   useEffect(() => {
     if (user) {
       setInvoiceNumber(generateInvoiceNumber());
+      
+      if (user.bankDetails) {
+        setBankDetails({
+          accountName: user.bankDetails.accountName || '',
+          accountNumber: user.bankDetails.accountNumber || '',
+          ifscCode: user.bankDetails.ifscCode || '',
+          bankName: user.bankDetails.bankName || ''
+        });
+      }
     }
   }, [user, generateInvoiceNumber]);
 
+  // Fetch invoice if editing
   useEffect(() => {
     if (id) {
       fetchInvoice(id);
@@ -92,13 +113,41 @@ const InvoiceGenerator = () => {
         setNotes(invoice.notes);
         setTerms(invoice.terms);
         setLogo(invoice.logo);
+        setLogoPreview(invoice.logo);
       } else {
-        toast("Error: Invoice not found");
+        toast.error("Error: Invoice not found");
       }
     } catch (error) {
       console.error('Error fetching invoice:', error);
-      toast("Error: Failed to fetch invoice");
+      toast.error("Error: Failed to fetch invoice");
     }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("Logo image must be smaller than 2MB");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setLogo(base64String);
+        setLogoPreview(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const removeLogo = () => {
+    setLogo(undefined);
+    setLogoPreview(undefined);
+  };
+
+  const toggleBankDetails = () => {
+    setShowBankDetails(!showBankDetails);
   };
 
   const handleAddItem = () => {
@@ -134,18 +183,26 @@ const InvoiceGenerator = () => {
     setCompany(prevCompany => ({ ...prevCompany, [field]: value }));
   };
 
-  const calculateItemAmount = (item: InvoiceItem): number => {
-    return item.quantity * item.rate;
+  const handleBankDetailsChange = (field: string, value: string) => {
+    setBankDetails(prev => ({ ...prev, [field]: value }));
   };
 
+  const calculateItemAmount = useCallback((item: InvoiceItem): number => {
+    return item.quantity * item.rate;
+  }, []);
+
   useEffect(() => {
-    setItems(prevItems =>
-      prevItems.map(item => ({ 
-        ...item, 
-        amount: calculateItemAmount(item) 
-      }))
-    );
-  }, [items]); // This will cause the effect to run whenever items changes
+    const updatedItems = items.map(item => ({
+      ...item,
+      amount: calculateItemAmount(item)
+    }));
+    
+    // Only update if the calculated amount is different
+    const hasChanged = updatedItems.some((item, index) => item.amount !== items[index].amount);
+    if (hasChanged) {
+      setItems(updatedItems);
+    }
+  }, [items, calculateItemAmount]);
 
   const handleDiscountChange = (value: number) => {
     setDiscount(value);
@@ -156,31 +213,31 @@ const InvoiceGenerator = () => {
       // Validate dates to ensure they are valid
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(issueDate) || !dateRegex.test(dueDate)) {
-        toast("Error: Please enter valid dates in YYYY-MM-DD format");
+        toast.error("Error: Please enter valid dates in YYYY-MM-DD format");
         return;
       }
 
       // Make sure all required fields are filled
       if (!client.name || !client.email || !client.address || !client.state) {
-        toast("Error: Please fill in all required client information");
+        toast.error("Error: Please fill in all required client information");
         return;
       }
 
       if (!company.name || !company.address || !company.gstin || !company.state || !company.signatory) {
-        toast("Error: Please fill in all required company information");
+        toast.error("Error: Please fill in all required company information");
         return;
       }
 
       // Check if there are any items
       if (items.length === 0) {
-        toast("Error: Please add at least one item to the invoice");
+        toast.error("Error: Please add at least one item to the invoice");
         return;
       }
 
       // Validate each item
       for (const item of items) {
         if (!item.description || item.quantity <= 0) {
-          toast("Error: All items must have a description and quantity greater than zero");
+          toast.error("Error: All items must have a description and quantity greater than zero");
           return;
         }
       }
@@ -260,7 +317,48 @@ const InvoiceGenerator = () => {
             </div>
           </div>
 
-          <div className="mt-4">
+          {/* Logo Upload Section */}
+          <div className="mt-6 border-t pt-4">
+            <h3 className="text-xl font-semibold mb-3">Company Logo</h3>
+            <div className="flex items-center gap-4">
+              {logoPreview ? (
+                <div className="relative">
+                  <img src={logoPreview} alt="Company logo" className="h-20 object-contain" />
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="absolute top-0 right-0 h-6 w-6 p-0" 
+                    onClick={removeLogo}
+                  >
+                    ×
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Label 
+                    htmlFor="logo-upload" 
+                    className="flex flex-col items-center justify-center w-32 h-20 border-2 border-dashed rounded-md border-gray-300 cursor-pointer hover:bg-gray-50"
+                  >
+                    <Upload size={24} className="text-gray-500" />
+                    <span className="mt-2 text-sm text-gray-500">Upload Logo</span>
+                  </Label>
+                  <Input 
+                    type="file" 
+                    id="logo-upload" 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleLogoUpload}
+                  />
+                </div>
+              )}
+              <div className="text-sm text-gray-500">
+                <p>Maximum size: 2MB</p>
+                <p>Recommended format: PNG or JPG</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
             <h3 className="text-xl font-semibold mb-2">Client Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -290,7 +388,7 @@ const InvoiceGenerator = () => {
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-6">
             <h3 className="text-xl font-semibold mb-2">Company Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -316,11 +414,76 @@ const InvoiceGenerator = () => {
             </div>
           </div>
 
-          <div className="mt-4">
+          {/* Bank Details Section */}
+          <div className="mt-6 border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-semibold">Bank Details</h3>
+              <Button type="button" variant="outline" size="sm" onClick={toggleBankDetails}>
+                {showBankDetails ? "Use Profile Bank Details" : "Add Custom Bank Details"}
+              </Button>
+            </div>
+            
+            {showBankDetails ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="accountName">Account Name</Label>
+                  <Input 
+                    type="text" 
+                    id="accountName" 
+                    value={bankDetails.accountName} 
+                    onChange={(e) => handleBankDetailsChange('accountName', e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="accountNumber">Account Number</Label>
+                  <Input 
+                    type="text" 
+                    id="accountNumber" 
+                    value={bankDetails.accountNumber} 
+                    onChange={(e) => handleBankDetailsChange('accountNumber', e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ifscCode">IFSC Code</Label>
+                  <Input 
+                    type="text" 
+                    id="ifscCode" 
+                    value={bankDetails.ifscCode} 
+                    onChange={(e) => handleBankDetailsChange('ifscCode', e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bankName">Bank Name</Label>
+                  <Input 
+                    type="text" 
+                    id="bankName" 
+                    value={bankDetails.bankName} 
+                    onChange={(e) => handleBankDetailsChange('bankName', e.target.value)} 
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 p-4 rounded">
+                <p className="text-sm">Using bank details from your profile. You can update them in your profile or add custom details for this invoice.</p>
+                {user?.bankDetails ? (
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                    <div><span className="font-medium">Account Name:</span> {user.bankDetails.accountName}</div>
+                    <div><span className="font-medium">Account Number:</span> {user.bankDetails.accountNumber}</div>
+                    <div><span className="font-medium">IFSC Code:</span> {user.bankDetails.ifscCode}</div>
+                    <div><span className="font-medium">Bank Name:</span> {user.bankDetails.bankName}</div>
+                  </div>
+                ) : (
+                  <p className="text-amber-500 text-sm mt-1">No bank details found in your profile. Please add them in your profile or add custom details for this invoice.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6">
             <h3 className="text-xl font-semibold mb-2">Invoice Items</h3>
             {items.map((item) => (
-              <div key={item.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 mb-2">
-                <div>
+              <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 mb-4 items-end">
+                <div className="md:col-span-2">
                   <Label htmlFor={`itemDescription-${item.id}`}>Description</Label>
                   <Input
                     type="text"
@@ -357,7 +520,7 @@ const InvoiceGenerator = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor={`itemGSTRate-${item.id}`}>GST Rate (%)</Label>
+                  <Label htmlFor={`itemGSTRate-${item.id}`}>GST %</Label>
                   <Input
                     type="number"
                     id={`itemGSTRate-${item.id}`}
@@ -365,18 +528,17 @@ const InvoiceGenerator = () => {
                     onChange={(e) => handleItemChange(item.id, 'gstRate', Number(e.target.value))}
                   />
                 </div>
-                <div>
-                  <Label htmlFor={`itemDiscount-${item.id}`}>Discount (%)</Label>
-                  <Input
-                    type="number"
-                    id={`itemDiscount-${item.id}`}
-                    value={item.discountPercent}
-                    onChange={(e) => handleItemChange(item.id, 'discountPercent', Number(e.target.value))}
-                  />
+                <div className="flex items-center mt-4 md:mt-0">
+                  <Button 
+                    type="button" 
+                    onClick={() => handleRemoveItem(item.id)} 
+                    variant="destructive" 
+                    size="sm"
+                    className="w-full"
+                  >
+                    Remove
+                  </Button>
                 </div>
-                <Button type="button" onClick={() => handleRemoveItem(item.id)} variant="destructive">
-                  Remove
-                </Button>
               </div>
             ))}
             <Button type="button" onClick={handleAddItem} className="mt-2 mb-4">Add Item</Button>
@@ -389,6 +551,7 @@ const InvoiceGenerator = () => {
               id="discount"
               value={discount}
               onChange={(e) => handleDiscountChange(Number(e.target.value))}
+              className="max-w-xs"
             />
           </div>
 
@@ -412,10 +575,10 @@ const InvoiceGenerator = () => {
             />
           </div>
 
-          <div className="mt-8 flex justify-end space-x-4">
+          <div className="mt-8 flex justify-end gap-4">
             <Button onClick={() => handleSave('draft')} variant="outline">Save as Draft</Button>
             <Button onClick={() => handleSave('sent')} variant="outline">Save & Send</Button>
-            <Button onClick={() => handleSave('paid')} variant="default">Save as Paid</Button>
+            <Button onClick={() => handleSave('paid')}>Save as Paid</Button>
           </div>
         </CardContent>
       </Card>

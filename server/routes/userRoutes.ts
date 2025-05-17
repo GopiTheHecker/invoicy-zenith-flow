@@ -113,6 +113,7 @@ router.post('/login', async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      bankDetails: user.bankDetails || null,
       token
     });
   } catch (error: any) {
@@ -138,6 +139,42 @@ router.get('/profile', authMiddleware, async (req, res) => {
     console.error('Profile error:', error);
     res.status(500).json({ 
       message: error.message || 'Failed to get user profile',
+      error: process.env.NODE_ENV === 'development' ? error : undefined  
+    });
+  }
+});
+
+// Update user bank details
+router.put('/bank-details', authMiddleware, async (req, res) => {
+  try {
+    const { accountName, accountNumber, ifscCode, bankName } = req.body;
+    
+    if (!accountName || !accountNumber || !ifscCode || !bankName) {
+      return res.status(400).json({ message: 'Please provide all bank details' });
+    }
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { 
+        bankDetails: { 
+          accountName, 
+          accountNumber, 
+          ifscCode, 
+          bankName 
+        } 
+      },
+      { new: true }
+    ).select('-password');
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json(updatedUser);
+  } catch (error: any) {
+    console.error('Update bank details error:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to update bank details',
       error: process.env.NODE_ENV === 'development' ? error : undefined  
     });
   }

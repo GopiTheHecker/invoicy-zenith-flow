@@ -12,17 +12,19 @@ interface RegisterData {
   password: string;
 }
 
+interface BankDetails {
+  accountName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+}
+
 interface UserResponse {
   _id: string;
   name: string;
   email: string;
   token: string;
-  bankDetails?: {
-    accountName: string;
-    accountNumber: string;
-    ifscCode: string;
-    bankName: string;
-  };
+  bankDetails?: BankDetails;
 }
 
 export const authService = {
@@ -125,6 +127,16 @@ export const authService = {
       return response.data;
     } catch (error) {
       console.error('Get profile API error:', error);
+      throw error;
+    }
+  },
+  
+  async updateBankDetails(bankDetails: BankDetails): Promise<UserResponse> {
+    try {
+      const response = await api.put('/users/bank-details', bankDetails);
+      return response.data;
+    } catch (error) {
+      console.error('Update bank details API error:', error);
       throw error;
     }
   }
