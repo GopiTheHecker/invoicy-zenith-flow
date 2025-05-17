@@ -34,7 +34,15 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   const start = Date.now();
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Request started`);
-  console.log('Request Headers:', req.headers);
+  
+  // Skip logging for large request bodies (like images)
+  if (req.body && JSON.stringify(req.body).length < 1000) {
+    console.log('Request Headers:', req.headers);
+    console.log('Request Body:', req.body);
+  } else {
+    console.log('Request Headers:', req.headers);
+    console.log('Request Body: [Large body, not logged]');
+  }
   
   // Capture and log response
   const originalSend = res.send;
@@ -48,6 +56,9 @@ app.use((req, res, next) => {
     } else {
       console.log('Response body: [Large response, not logged]');
     }
+    
+    // Make sure Content-Type is set to application/json, overriding any other settings
+    res.header('Content-Type', 'application/json');
     
     return originalSend.call(this, body);
   };

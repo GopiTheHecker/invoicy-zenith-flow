@@ -27,7 +27,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data);
     return config;
   },
   (error) => {
@@ -39,13 +39,13 @@ api.interceptors.request.use(
 // Add a response interceptor for better error handling
 api.interceptors.response.use(
   (response) => {
-    console.log(`API Response Success: ${response.status} ${response.config.url}`);
+    console.log(`API Response Success: ${response.status} ${response.config.url}`, response.data);
     
     // Check if response is HTML instead of JSON (indicates an error)
     const contentType = response.headers['content-type'];
     if (contentType && contentType.includes('text/html')) {
       console.error('Received HTML response instead of JSON', response.data);
-      return Promise.reject(new Error('Invalid response format from server'));
+      throw new Error('Invalid response format from server');
     }
     
     return response;
@@ -54,24 +54,24 @@ api.interceptors.response.use(
     if (!error.response) {
       console.error('Network Error - Cannot connect to API server:', error.message);
       // Use guest mode if API server is unavailable
-      return Promise.reject(new Error('Cannot connect to the server. Using guest mode.'));
+      throw new Error('Cannot connect to the server. Using guest mode.');
     }
     
     if (error.code === 'ECONNABORTED') {
       console.error('API Request Timeout:', error.message);
-      return Promise.reject(new Error('Request timeout. Please check your internet connection and try again.'));
+      throw new Error('Request timeout. Please check your internet connection and try again.');
     }
     
     // Check if response is HTML instead of JSON
     const contentType = error.response?.headers?.['content-type'];
     if (contentType && contentType.includes('text/html')) {
       console.error('Received HTML error response instead of JSON', error.response.data);
-      return Promise.reject(new Error('Invalid response format from server'));
+      throw new Error('Invalid response format from server');
     }
     
     const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';
     console.error('API Response Error:', error.response?.status, errorMessage);
-    return Promise.reject(error);
+    throw error;
   }
 );
 

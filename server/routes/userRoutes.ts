@@ -17,6 +17,30 @@ const generateToken = (userId: string, email: string) => {
   );
 };
 
+// Check if email exists
+router.post('/check-email', async (req, res) => {
+  try {
+    console.log('Check email route hit with:', req.body);
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+    
+    return res.json({ 
+      exists: !!user 
+    });
+  } catch (error: any) {
+    console.error('Check email error:', error);
+    return res.status(500).json({ 
+      message: error.message || 'Failed to check email',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
+  }
+});
+
 // Register a new user
 router.post('/register', async (req, res) => {
   try {

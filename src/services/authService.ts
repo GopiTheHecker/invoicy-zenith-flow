@@ -28,22 +28,37 @@ interface UserResponse {
 }
 
 export const authService = {
+  async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      const response = await api.post('/users/check-email', { email });
+      return response.data.exists;
+    } catch (error) {
+      console.error('Check email API error:', error);
+      // If there's an error contacting the server, assume the email doesn't exist
+      return false;
+    }
+  },
+  
   async login(data: LoginData): Promise<UserResponse> {
     try {
       console.log('Attempting login with:', { email: data.email });
       
-      // Check connection first with a timeout
+      // Try to detect if we're in offline/guest mode first
+      if (navigator.onLine === false) {
+        throw new Error('Offline mode detected');
+      }
+      
       const response = await api.post('/users/login', data, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
         transformResponse: [(data) => {
-          // Handle HTML responses (which indicate an error in the API)
-          if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
-            throw new Error('Invalid response format from server');
-          }
           try {
+            // Handle HTML responses (which indicate an error in the API)
+            if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
+              throw new Error('Invalid response format from server');
+            }
             return JSON.parse(data);
           } catch (e) {
             console.error('Error parsing response:', e);
@@ -62,7 +77,7 @@ export const authService = {
         throw new Error('Network Error');
       }
       
-      if (error.response.status === 401) {
+      if (error.response?.status === 401) {
         throw new Error('Invalid email or password');
       }
       
@@ -79,17 +94,33 @@ export const authService = {
     try {
       console.log('Attempting registration with:', { name: data.name, email: data.email });
       
+      // Try to detect if we're in offline/guest mode first
+      if (navigator.onLine === false) {
+        throw new Error('Offline mode detected');
+      }
+      
+      // First check if email already exists
+      try {
+        const emailExists = await this.checkEmailExists(data.email);
+        if (emailExists) {
+          throw new Error('Email is already registered');
+        }
+      } catch (error) {
+        // If we can't check email existence, proceed with registration anyway
+        console.warn('Could not check if email exists:', error);
+      }
+      
       const response = await api.post('/users/register', data, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
         transformResponse: [(data) => {
-          // Handle HTML responses (which indicate an error in the API)
-          if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
-            throw new Error('Invalid response format from server');
-          }
           try {
+            // Handle HTML responses (which indicate an error in the API)
+            if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
+              throw new Error('Invalid response format from server');
+            }
             return JSON.parse(data);
           } catch (e) {
             console.error('Error parsing response:', e);
@@ -108,7 +139,7 @@ export const authService = {
         throw new Error('Network Error');
       }
       
-      if (error.response.status === 400 && error.response.data.message === 'User already exists') {
+      if (error.response?.status === 400 && error.response.data.message === 'User already exists') {
         throw new Error('Email is already registered');
       }
       
