@@ -9,6 +9,8 @@ const BASE_URL = isDevelopment
   ? 'http://localhost:5000/api' 
   : '/api'; // Changed to relative path to work in the Lovable preview environment
 
+console.log('API Base URL:', BASE_URL);
+
 // Create axios instance with configured base URL
 const api = axios.create({
   baseURL: BASE_URL,
@@ -20,6 +22,19 @@ const api = axios.create({
   timeout: 30000, // 30 seconds
 });
 
+// Function to check if response is HTML
+const isHtmlResponse = (data, headers) => {
+  if (headers && headers['content-type'] && headers['content-type'].includes('text/html')) {
+    return true;
+  }
+  
+  if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE html>')) {
+    return true;
+  }
+  
+  return false;
+};
+
 // Add a request interceptor to include token in requests
 api.interceptors.request.use(
   (config) => {
@@ -27,6 +42,11 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Always set these headers to ensure proper responses
+    config.headers.Accept = 'application/json';
+    config.headers['Content-Type'] = 'application/json';
+    
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data);
     return config;
   },
@@ -39,39 +59,48 @@ api.interceptors.request.use(
 // Add a response interceptor for better error handling
 api.interceptors.response.use(
   (response) => {
-    console.log(`API Response Success: ${response.status} ${response.config.url}`, response.data);
+    console.log(`API Response Success: ${response.status} ${response.config.url}`);
     
-    // Check if response is HTML instead of JSON (indicates an error)
-    const contentType = response.headers['content-type'];
-    if (contentType && contentType.includes('text/html')) {
+    // Check if response is HTML instead of JSON
+    if (isHtmlResponse(response.data, response.headers)) {
       console.error('Received HTML response instead of JSON', response.data);
-      throw new Error('Invalid response format from server');
+      return Promise.reject(new Error('Invalid response format from server'));
+    }
+    
+    // Additional safeguard for string responses - try to parse JSON if string
+    if (typeof response.data === 'string') {
+      try {
+        response.data = JSON.parse(response.data);
+      } catch (e) {
+        console.error('Failed to parse string response as JSON:', response.data);
+        return Promise.reject(new Error('Invalid JSON response from server'));
+      }
     }
     
     return response;
   },
   (error) => {
+    // Network errors (no response)
     if (!error.response) {
       console.error('Network Error - Cannot connect to API server:', error.message);
-      // Use guest mode if API server is unavailable
-      throw new Error('Cannot connect to the server. Using guest mode.');
+      return Promise.reject(new Error('Cannot connect to the server. Using guest mode.'));
     }
     
+    // Timeout errors
     if (error.code === 'ECONNABORTED') {
       console.error('API Request Timeout:', error.message);
-      throw new Error('Request timeout. Please check your internet connection and try again.');
+      return Promise.reject(new Error('Request timeout. Please check your internet connection and try again.'));
     }
     
-    // Check if response is HTML instead of JSON
-    const contentType = error.response?.headers?.['content-type'];
-    if (contentType && contentType.includes('text/html')) {
+    // Check if error response is HTML
+    if (isHtmlResponse(error.response?.data, error.response?.headers)) {
       console.error('Received HTML error response instead of JSON', error.response.data);
-      throw new Error('Invalid response format from server');
+      return Promise.reject(new Error('Invalid response format from server'));
     }
     
     const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';
     console.error('API Response Error:', error.response?.status, errorMessage);
-    throw error;
+    return Promise.reject(error);
   }
 );
 

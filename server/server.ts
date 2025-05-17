@@ -12,21 +12,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://vichusci:GOPIVAII@cluster0.epz6g.mongodb.net/invoice-app';
 
-// Middleware - Expanded CORS settings to ensure frontend connection works
+// Ensure proper CORS headers for all environments
 app.use(cors({
-  origin: '*', // Allow all origins for development and preview environments
-  credentials: true,
+  origin: '*', // Allow all origins for development and preview
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
 // Increase JSON limit for base64 encoded images
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add Content-Type response header to ensure proper JSON responses
+// Always set Content-Type to application/json for API responses
 app.use((req, res, next) => {
-  res.header('Content-Type', 'application/json');
+  // Skip for OPTIONS requests
+  if (req.method !== 'OPTIONS') {
+    res.header('Content-Type', 'application/json');
+  }
   next();
 });
 
@@ -57,14 +60,20 @@ app.use((req, res, next) => {
       console.log('Response body: [Large response, not logged]');
     }
     
-    // Make sure Content-Type is set to application/json, overriding any other settings
-    res.header('Content-Type', 'application/json');
+    // CRITICAL: Ensure response has proper Content-Type for API routes
+    // This prevents HTML responses from being sent
+    if (req.url.startsWith('/api/')) {
+      res.header('Content-Type', 'application/json');
+    }
     
     return originalSend.call(this, body);
   };
   
   next();
 });
+
+// Handle preflight OPTIONS requests properly
+app.options('*', cors());
 
 // Wrap all route handlers in try-catch to prevent HTML error responses
 const wrapAsync = (fn) => {
@@ -88,9 +97,15 @@ app.get('/api/status', wrapAsync(async (req, res) => {
   });
 }));
 
-// Routes
+// Routes - ensure they have /api prefix
 app.use('/api/users', userRouter);
 app.use('/api/invoices', invoiceRouter);
+
+// Fix for HTML page being returned from invalid routes
+// Add catchall for API routes to return JSON instead of HTML
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ message: 'API endpoint not found' });
+});
 
 // Connect to MongoDB with improved error handling
 mongoose.connect(MONGODB_URI)
@@ -99,29 +114,37 @@ mongoose.connect(MONGODB_URI)
     console.log('Database name:', mongoose.connection.name);
     
     // Start server only after successful database connection
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    startServer();
   })
   .catch((error) => {
     console.error('MongoDB connection error:', error);
     console.log('Starting server anyway to allow frontend development with localStorage');
     
-    // Start server even without DB connection to allow frontend development
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT} (without DB connection)`);
-    });
+    // Start server even without DB connection
+    startServer();
   });
+
+function startServer() {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`API base URL: http://localhost:${PORT}/api`);
+  });
+}
 
 // Global error handler - Always return JSON responses
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   
-  // Ensure response is always JSON
-  res.status(500).json({ 
-    message: 'Something went wrong on the server',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+  // For API routes, ensure response is always JSON
+  if (req.url.startsWith('/api/')) {
+    res.status(500).json({ 
+      message: 'Something went wrong on the server',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  } else {
+    // For non-API routes, continue with default error handling
+    next(err);
+  }
 });
 
 // Handle uncaught exceptions
