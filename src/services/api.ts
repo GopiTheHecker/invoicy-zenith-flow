@@ -14,9 +14,10 @@ const api = axios.create({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
   // Increased timeout for slower connections
-  timeout: 120000, // Further increased from 60000 to 120000 ms for Lovable environment
+  timeout: 120000, // 120 seconds
 });
 
 // Add a request interceptor to include token in requests
@@ -39,6 +40,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     console.log(`API Response Success: ${response.status} ${response.config.url}`);
+    
+    // Check if response is HTML instead of JSON (indicates an error)
+    const contentType = response.headers['content-type'];
+    if (contentType && contentType.includes('text/html')) {
+      console.error('Received HTML response instead of JSON', response.data);
+      return Promise.reject(new Error('Invalid response format from server'));
+    }
+    
     return response;
   },
   (error) => {
@@ -50,6 +59,13 @@ api.interceptors.response.use(
     if (error.code === 'ECONNABORTED') {
       console.error('API Request Timeout:', error.message);
       return Promise.reject(new Error('Request timeout. Please check your internet connection and try again.'));
+    }
+    
+    // Check if response is HTML instead of JSON
+    const contentType = error.response?.headers?.['content-type'];
+    if (contentType && contentType.includes('text/html')) {
+      console.error('Received HTML error response instead of JSON', error.response.data);
+      return Promise.reject(new Error('Invalid response format from server'));
     }
     
     const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';

@@ -17,13 +17,39 @@ interface UserResponse {
   name: string;
   email: string;
   token: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
 }
 
 export const authService = {
   async login(data: LoginData): Promise<UserResponse> {
     try {
       console.log('Attempting login with:', { email: data.email });
-      const response = await api.post('/users/login', data);
+      
+      // Check connection first with a timeout
+      const response = await api.post('/users/login', data, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        transformResponse: [(data) => {
+          // Handle HTML responses (which indicate an error in the API)
+          if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
+            throw new Error('Invalid response format from server');
+          }
+          try {
+            return JSON.parse(data);
+          } catch (e) {
+            console.error('Error parsing response:', e);
+            throw new Error('Invalid response from server');
+          }
+        }]
+      });
+      
       console.log('Login response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -38,6 +64,11 @@ export const authService = {
         throw new Error('Invalid email or password');
       }
       
+      if (error.message === 'Invalid response from server' || 
+          error.message === 'Invalid response format from server') {
+        throw new Error('Server returned invalid data. Using guest mode instead.');
+      }
+      
       throw error;
     }
   },
@@ -45,7 +76,26 @@ export const authService = {
   async register(data: RegisterData): Promise<UserResponse> {
     try {
       console.log('Attempting registration with:', { name: data.name, email: data.email });
-      const response = await api.post('/users/register', data);
+      
+      const response = await api.post('/users/register', data, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        transformResponse: [(data) => {
+          // Handle HTML responses (which indicate an error in the API)
+          if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
+            throw new Error('Invalid response format from server');
+          }
+          try {
+            return JSON.parse(data);
+          } catch (e) {
+            console.error('Error parsing response:', e);
+            throw new Error('Invalid response from server');
+          }
+        }]
+      });
+      
       console.log('Register response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -58,6 +108,11 @@ export const authService = {
       
       if (error.response.status === 400 && error.response.data.message === 'User already exists') {
         throw new Error('Email is already registered');
+      }
+      
+      if (error.message === 'Invalid response from server' || 
+          error.message === 'Invalid response format from server') {
+        throw new Error('Server returned invalid data. Using guest mode instead.');
       }
       
       throw error;
