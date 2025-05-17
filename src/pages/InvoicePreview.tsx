@@ -1,10 +1,8 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useInvoices, Invoice } from "@/contexts/InvoiceContext";
 import { ArrowLeft, Download, Mail, Pencil } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -28,39 +26,48 @@ const InvoicePreview = () => {
             const invoiceData = await getInvoice(id);
             if (invoiceData) {
               setInvoice(invoiceData);
+            } else {
+              toast.error("Invoice not found");
+              navigate('/dashboard');
             }
           }
         }
       } catch (error) {
         console.error("Error fetching invoice:", error);
         toast.error("Failed to load invoice");
+        navigate('/dashboard');
       }
     };
 
     fetchInvoice();
-  }, [id, currentInvoice, getInvoice]);
+  }, [id, currentInvoice, getInvoice, navigate]);
 
   const handleDownloadPDF = async () => {
     const element = document.getElementById('invoice-pdf');
     if (!element) return;
 
-    const canvas = await html2canvas(element);
-    const imgData = canvas.toDataURL('image/png');
-    
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-    
-    // Calculate dimensions to fit the content properly
-    const imgWidth = 210; // A4 width in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-    pdf.save(`invoice-${invoice?.invoiceNumber}.pdf`);
-    
-    toast.success("Invoice downloaded as PDF");
+    try {
+      const canvas = await html2canvas(element);
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Calculate dimensions to fit the content properly
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`invoice-${invoice?.invoiceNumber}.pdf`);
+      
+      toast.success("Invoice downloaded as PDF");
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast.error("Failed to generate PDF");
+    }
   };
 
   const handleSendEmail = () => {
@@ -77,9 +84,23 @@ const InvoicePreview = () => {
 
   const formatDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), 'dd/MM/yyyy');
-    } catch (e) {
-      return dateString;
+      // First check if the date is in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+      }
+      
+      // Otherwise try to parse it as ISO string
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        // If invalid, return the original string
+        return dateString;
+      }
+      
+      return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    } catch (error) {
+      console.error("Date formatting error:", error);
+      return dateString; // Return original string if any error occurs
     }
   };
 
@@ -90,7 +111,7 @@ const InvoicePreview = () => {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/dashboard')}
             className="mr-2"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />

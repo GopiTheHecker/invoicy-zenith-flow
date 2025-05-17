@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
 import { authService } from '@/services/authService';
 
@@ -14,6 +14,18 @@ type User = {
     bankName: string;
   };
 };
+
+export interface UserResponse {
+  id: string;
+  name: string;
+  email: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
+}
 
 type AuthContextType = {
   user: User | null;

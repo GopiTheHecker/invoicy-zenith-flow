@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Invoice, InvoiceItem } from '@/contexts/InvoiceContext';
 
 const InvoiceGenerator = () => {
@@ -47,6 +47,23 @@ const InvoiceGenerator = () => {
   const { createInvoice, updateInvoice, getInvoice, generateInvoiceNumber, calculateInvoiceValues, setCurrentInvoice } = useInvoices();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+
+  // Set default dates when component loads
+  useEffect(() => {
+    // Set today as the default issue date
+    const today = new Date();
+    const formattedToday = today.toISOString().split('T')[0];
+    setIssueDate(formattedToday);
+    
+    // Set due date as 30 days from today
+    const dueDate = new Date();
+    dueDate.setDate(today.getDate() + 30);
+    const formattedDueDate = dueDate.toISOString().split('T')[0];
+    setDueDate(formattedDueDate);
+    
+    // Set default payment terms
+    setPaymentTerms('Net 30 days');
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -136,6 +153,38 @@ const InvoiceGenerator = () => {
 
   const handleSave = async (status: 'draft' | 'sent' | 'paid' = 'draft') => {
     try {
+      // Validate dates to ensure they are valid
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(issueDate) || !dateRegex.test(dueDate)) {
+        toast("Error: Please enter valid dates in YYYY-MM-DD format");
+        return;
+      }
+
+      // Make sure all required fields are filled
+      if (!client.name || !client.email || !client.address || !client.state) {
+        toast("Error: Please fill in all required client information");
+        return;
+      }
+
+      if (!company.name || !company.address || !company.gstin || !company.state || !company.signatory) {
+        toast("Error: Please fill in all required company information");
+        return;
+      }
+
+      // Check if there are any items
+      if (items.length === 0) {
+        toast("Error: Please add at least one item to the invoice");
+        return;
+      }
+
+      // Validate each item
+      for (const item of items) {
+        if (!item.description || item.quantity <= 0) {
+          toast("Error: All items must have a description and quantity greater than zero");
+          return;
+        }
+      }
+
       // Calculate values based on invoice items
       const {
         subtotal,
@@ -177,10 +226,11 @@ const InvoiceGenerator = () => {
       setCurrentInvoice(newInvoice);
       
       // Navigate to preview
-      navigate(`/invoice/${newInvoice.id}/preview`);
+      navigate(`/invoice/preview/${newInvoice.id}`);
+      toast.success("Invoice saved successfully");
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast("Error: Failed to save invoice");
+      toast.error("Error: Failed to save invoice");
     }
   };
 
@@ -329,7 +379,7 @@ const InvoiceGenerator = () => {
                 </Button>
               </div>
             ))}
-            <Button type="button" onClick={handleAddItem}>Add Item</Button>
+            <Button type="button" onClick={handleAddItem} className="mt-2 mb-4">Add Item</Button>
           </div>
 
           <div className="mt-4">
@@ -362,10 +412,10 @@ const InvoiceGenerator = () => {
             />
           </div>
 
-          <div className="mt-4">
-            <Button onClick={() => handleSave('draft')}>Save as Draft</Button>
-            <Button onClick={() => handleSave('sent')}>Save & Send</Button>
-            <Button onClick={() => handleSave('paid')}>Save as Paid</Button>
+          <div className="mt-8 flex justify-end space-x-4">
+            <Button onClick={() => handleSave('draft')} variant="outline">Save as Draft</Button>
+            <Button onClick={() => handleSave('sent')} variant="outline">Save & Send</Button>
+            <Button onClick={() => handleSave('paid')} variant="default">Save as Paid</Button>
           </div>
         </CardContent>
       </Card>

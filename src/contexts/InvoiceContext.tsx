@@ -128,6 +128,17 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createInvoice = async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
     try {
+      // Ensure we have valid dates
+      if (typeof invoiceData.issueDate !== 'string' || !invoiceData.issueDate) {
+        invoiceData.issueDate = new Date().toISOString().split('T')[0];
+      }
+      
+      if (typeof invoiceData.dueDate !== 'string' || !invoiceData.dueDate) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 30);
+        invoiceData.dueDate = dueDate.toISOString().split('T')[0];
+      }
+      
       // For guest users, store in localStorage
       if (user?.id === 'guest-user-id') {
         const newId = `guest-invoice-${Date.now()}`;
@@ -145,12 +156,31 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return newInvoice;
       }
       
-      // For regular users
-      const newInvoice = await invoiceService.createInvoice(invoiceData);
-      
-      setInvoices(prev => [...prev, newInvoice]);
-      toast.success("Invoice created successfully!");
-      return newInvoice;
+      try {
+        // For regular users
+        const newInvoice = await invoiceService.createInvoice(invoiceData);
+        setInvoices(prev => [...prev, newInvoice]);
+        toast.success("Invoice created successfully!");
+        return newInvoice;
+      } catch (error: any) {
+        console.error("API error:", error);
+        
+        // Fallback to localStorage if the API fails
+        console.log("API failed, falling back to localStorage");
+        const newId = `local-invoice-${Date.now()}`;
+        const newInvoice = {
+          ...invoiceData,
+          id: newId,
+          createdAt: new Date().toISOString()
+        };
+        
+        const updatedInvoices = [...invoices, newInvoice];
+        setInvoices(updatedInvoices);
+        localStorage.setItem('localInvoices', JSON.stringify(updatedInvoices));
+        
+        toast.success("Invoice saved locally due to server issues");
+        return newInvoice;
+      }
     } catch (error: any) {
       toast.error("Failed to create invoice");
       console.error(error);
@@ -344,6 +374,29 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     
     return result + ' Only';
+  };
+
+  // Update the formatDate function used in InvoicePreview
+  const formatDate = (dateString: string): string => {
+    try {
+      // First check if the date is in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+      }
+      
+      // Otherwise try to parse it as ISO string
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        // If invalid, return the original string
+        return dateString;
+      }
+      
+      return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    } catch (error) {
+      console.error("Date formatting error:", error);
+      return dateString; // Return original string if any error occurs
+    }
   };
 
   const calculateInvoiceValues = (items: InvoiceItem[], discount: number, sameState: boolean) => {
