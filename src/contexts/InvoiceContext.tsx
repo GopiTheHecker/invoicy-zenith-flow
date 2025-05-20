@@ -108,22 +108,68 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!user) return;
     
     try {
-      // For guest users, check localStorage
+      // For all users, first check localStorage
+      const storedLocalInvoices = localStorage.getItem('localInvoices');
+      let localInvoices: Invoice[] = [];
+      
+      if (storedLocalInvoices) {
+        localInvoices = JSON.parse(storedLocalInvoices);
+      }
+      
+      // For guest users, use only localStorage
       if (user.id === 'guest-user-id') {
-        const storedInvoices = localStorage.getItem('guestInvoices');
-        if (storedInvoices) {
-          setInvoices(JSON.parse(storedInvoices));
+        const storedGuestInvoices = localStorage.getItem('guestInvoices');
+        if (storedGuestInvoices) {
+          const guestInvoices = JSON.parse(storedGuestInvoices);
+          setInvoices([...guestInvoices, ...localInvoices]);
+        } else {
+          setInvoices(localInvoices);
         }
         return;
       }
       
-      // For regular users, fetch from API
-      const data = await invoiceService.getAllInvoices();
-      setInvoices(data);
+      // For regular users, try to fetch from API
+      try {
+        const data = await invoiceService.getAllInvoices();
+        
+        // Merge remote data with local data (prioritizing remote data)
+        const remoteIds = data.map(invoice => invoice.id);
+        const uniqueLocalInvoices = localInvoices.filter(invoice => !remoteIds.includes(invoice.id));
+        
+        setInvoices([...data, ...uniqueLocalInvoices]);
+        
+        // Sync local invoices to server if there are any
+        if (uniqueLocalInvoices.length > 0) {
+          toast.info(`Syncing ${uniqueLocalInvoices.length} local invoices to server...`);
+          syncLocalInvoicesToServer(uniqueLocalInvoices);
+        }
+      } catch (error) {
+        console.error("API error, using local data:", error);
+        setInvoices(localInvoices);
+        toast.error("Could not connect to server. Using locally stored invoices.");
+      }
     } catch (error: any) {
       toast.error("Failed to fetch invoices");
       console.error(error);
     }
+  };
+
+  // New function to sync local invoices to server
+  const syncLocalInvoicesToServer = async (localInvoices: Invoice[]) => {
+    if (!user || user.id === 'guest-user-id') return;
+    
+    for (const invoice of localInvoices) {
+      try {
+        // Remove local-specific ID format if present
+        const { id, createdAt, ...invoiceData } = invoice;
+        await invoiceService.createInvoice(invoiceData);
+      } catch (error) {
+        console.error("Failed to sync invoice to server:", error);
+      }
+    }
+    
+    // Clear local invoices after successful sync
+    localStorage.removeItem('localInvoices');
   };
 
   const createInvoice = async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
@@ -139,28 +185,56 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         invoiceData.dueDate = dueDate.toISOString().split('T')[0];
       }
       
-      // For guest users, store in localStorage
-      if (user?.id === 'guest-user-id') {
-        const newId = `guest-invoice-${Date.now()}`;
+      // For guest users or when offline, store in localStorage
+      if (user?.id === 'guest-user-id' || !navigator.onLine) {
+        const storageKey = user?.id === 'guest-user-id' ? 'guestInvoices' : 'localInvoices';
+        const newId = `${storageKey.replace('Invoices', '')}-invoice-${Date.now()}`;
         const newInvoice = {
           ...invoiceData,
           id: newId,
           createdAt: new Date().toISOString()
         };
         
-        const updatedInvoices = [...invoices, newInvoice];
-        setInvoices(updatedInvoices);
-        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
+        const storedInvoices = localStorage.getItem(storageKey);
+        let updatedInvoices = [newInvoice];
         
-        toast.success("Invoice created successfully!");
+        if (storedInvoices) {
+          const parsedInvoices = JSON.parse(storedInvoices);
+          updatedInvoices = [...parsedInvoices, newInvoice];
+        }
+        
+        localStorage.setItem(storageKey, JSON.stringify(updatedInvoices));
+        setInvoices(prev => [...prev, newInvoice]);
+        
+        toast.success(user?.id === 'guest-user-id' 
+          ? "Invoice created successfully (Guest mode)"
+          : "Invoice saved locally (Offline mode)");
+        
         return newInvoice;
       }
       
       try {
-        // For regular users
+        // For regular users, try online mode first
         const newInvoice = await invoiceService.createInvoice(invoiceData);
         setInvoices(prev => [...prev, newInvoice]);
-        toast.success("Invoice created successfully!");
+        
+        // Also store in localStorage as backup
+        const localCopy = {
+          ...newInvoice,
+          _synced: true // Mark as already synced with server
+        };
+        
+        const storedInvoices = localStorage.getItem('localInvoices');
+        let updatedLocalInvoices = [localCopy];
+        
+        if (storedInvoices) {
+          const parsedInvoices = JSON.parse(storedInvoices);
+          updatedLocalInvoices = [...parsedInvoices, localCopy];
+        }
+        
+        localStorage.setItem('localInvoices', JSON.stringify(updatedLocalInvoices));
+        
+        toast.success("Invoice created and stored successfully!");
         return newInvoice;
       } catch (error: any) {
         console.error("API error:", error);
@@ -174,11 +248,18 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           createdAt: new Date().toISOString()
         };
         
-        const updatedInvoices = [...invoices, newInvoice];
-        setInvoices(updatedInvoices);
-        localStorage.setItem('localInvoices', JSON.stringify(updatedInvoices));
+        const storedInvoices = localStorage.getItem('localInvoices');
+        let updatedInvoices = [newInvoice];
         
-        toast.success("Invoice saved locally due to server issues");
+        if (storedInvoices) {
+          const parsedInvoices = JSON.parse(storedInvoices);
+          updatedInvoices = [...parsedInvoices, newInvoice];
+        }
+        
+        localStorage.setItem('localInvoices', JSON.stringify(updatedInvoices));
+        setInvoices(prev => [...prev, newInvoice]);
+        
+        toast.success("Invoice saved locally due to connection issues");
         return newInvoice;
       }
     } catch (error: any) {
@@ -190,27 +271,64 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateInvoice = async (id: string, invoiceData: Partial<Invoice>) => {
     try {
-      // For guest users, update in localStorage
-      if (user?.id === 'guest-user-id') {
-        const updatedInvoices = invoices.map(invoice => 
-          invoice.id === id ? { ...invoice, ...invoiceData } : invoice
-        );
+      // First, update the invoice in state
+      const updatedInvoices = invoices.map(invoice => 
+        invoice.id === id ? { ...invoice, ...invoiceData } : invoice
+      );
+      
+      setInvoices(updatedInvoices);
+      
+      // For guest users or offline mode, update only in localStorage
+      if (user?.id === 'guest-user-id' || !navigator.onLine) {
+        const storageKey = id.startsWith('guest-') ? 'guestInvoices' : 'localInvoices';
+        localStorage.setItem(storageKey, JSON.stringify(updatedInvoices));
         
-        setInvoices(updatedInvoices);
-        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
         toast.success("Invoice updated successfully!");
         return;
       }
       
-      // For regular users
-      const updatedInvoice = await invoiceService.updateInvoice(id, invoiceData);
-      
-      setInvoices(prev => 
-        prev.map(invoice => 
-          invoice.id === id ? { ...invoice, ...updatedInvoice } : invoice
-        )
-      );
-      toast.success("Invoice updated successfully!");
+      // For regular users in online mode
+      try {
+        await invoiceService.updateInvoice(id, invoiceData);
+        
+        // Also update in localStorage as backup
+        const allLocalInvoices = localStorage.getItem('localInvoices');
+        if (allLocalInvoices) {
+          const parsedInvoices = JSON.parse(allLocalInvoices);
+          const updatedLocalInvoices = parsedInvoices.map((invoice: Invoice) => 
+            invoice.id === id ? { ...invoice, ...invoiceData, _synced: true } : invoice
+          );
+          localStorage.setItem('localInvoices', JSON.stringify(updatedLocalInvoices));
+        }
+        
+        toast.success("Invoice updated successfully!");
+      } catch (error) {
+        console.error("API update failed, saving locally:", error);
+        
+        // On API failure, ensure the update is saved locally
+        const allLocalInvoices = localStorage.getItem('localInvoices');
+        const updatedInvoice = updatedInvoices.find(inv => inv.id === id);
+        
+        if (updatedInvoice) {
+          let localInvoices = [];
+          if (allLocalInvoices) {
+            localInvoices = JSON.parse(allLocalInvoices);
+            // Check if invoice exists in local storage
+            const localIndex = localInvoices.findIndex((inv: Invoice) => inv.id === id);
+            if (localIndex >= 0) {
+              localInvoices[localIndex] = { ...updatedInvoice, _synced: false };
+            } else {
+              localInvoices.push({ ...updatedInvoice, _synced: false });
+            }
+          } else {
+            localInvoices = [{ ...updatedInvoice, _synced: false }];
+          }
+          
+          localStorage.setItem('localInvoices', JSON.stringify(localInvoices));
+        }
+        
+        toast.info("Invoice saved locally due to connection issues");
+      }
     } catch (error: any) {
       toast.error("Failed to update invoice");
       console.error(error);
@@ -467,3 +585,5 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     </InvoiceContext.Provider>
   );
 };
+
+export default InvoiceProvider;

@@ -24,13 +24,19 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const quantity = parseFloat(e.target.value) || 0;
-    const amount = quantity * item.rate;
+    // Calculate amount considering discount
+    const baseAmount = quantity * item.rate;
+    const discountAmount = baseAmount * (item.discountPercent / 100);
+    const amount = baseAmount - discountAmount;
     onChange(item.id, { quantity, amount });
   };
 
   const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rate = parseFloat(e.target.value) || 0;
-    const amount = rate * item.quantity;
+    // Calculate amount considering discount
+    const baseAmount = rate * item.quantity;
+    const discountAmount = baseAmount * (item.discountPercent / 100);
+    const amount = baseAmount - discountAmount;
     onChange(item.id, { rate, amount });
   };
 
@@ -43,8 +49,18 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
   };
 
   const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(item.id, { discountPercent: parseFloat(e.target.value) || 0 });
+    const discountPercent = parseFloat(e.target.value) || 0;
+    // Recalculate amount considering new discount
+    const baseAmount = item.quantity * item.rate;
+    const discountAmount = baseAmount * (discountPercent / 100);
+    const amount = baseAmount - discountAmount;
+    onChange(item.id, { discountPercent, amount });
   };
+
+  // Calculate the visible amount (before discount) and discounted amount
+  const baseAmount = item.quantity * item.rate;
+  const discountAmount = baseAmount * (item.discountPercent / 100);
+  const finalAmount = baseAmount - discountAmount;
 
   return (
     <div className="flex flex-col md:flex-row gap-3 items-start py-2 border-b last:border-b-0">
@@ -96,6 +112,7 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
           min="0"
           max="100"
           step="0.01"
+          className="border-amber-300 focus:border-amber-500"
         />
       </div>
       
@@ -110,9 +127,14 @@ const InvoiceItemRow: React.FC<InvoiceItemRowProps> = ({
         />
       </div>
       
-      <div className="w-full md:w-32 flex items-center">
+      <div className="w-full md:w-32 flex flex-col items-end">
+        {item.discountPercent > 0 && (
+          <span className="text-xs text-gray-500 line-through mb-1 w-full text-right">
+            ₹{baseAmount.toFixed(2)}
+          </span>
+        )}
         <span className="bg-gray-50 px-3 py-2 rounded-md w-full text-right">
-          ₹{item.amount.toFixed(2)}
+          ₹{finalAmount.toFixed(2)}
         </span>
       </div>
       

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const InvoicePreview = () => {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -15,6 +17,7 @@ const InvoicePreview = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const bankDetails = user?.bankDetails || getUserBankDetails();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -51,8 +54,24 @@ const InvoicePreview = () => {
     try {
       toast.info("Generating PDF...");
       
-      const canvas = await html2canvas(element);
-      const imgData = canvas.toDataURL('image/png');
+      // Improved PDF generation with better scale handling
+      const scale = 2; // Higher scale for better quality
+      const canvas = await html2canvas(element, {
+        scale: scale,
+        useCORS: true,
+        allowTaint: true,
+        scrollY: -window.scrollY,
+        windowWidth: document.documentElement.offsetWidth,
+        windowHeight: document.documentElement.offsetHeight
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      
+      // Calculate PDF dimensions based on content
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const heightLeft = imgHeight;
       
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -60,11 +79,20 @@ const InvoicePreview = () => {
         format: 'a4'
       });
       
-      // Calculate dimensions to fit the content properly
-      const imgWidth = 210; // A4 width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let position = 0;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      // First page
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add new pages if content exceeds page height
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
       pdf.save(`invoice-${invoice?.invoiceNumber}.pdf`);
       
       toast.success("Invoice downloaded as PDF");
@@ -121,7 +149,7 @@ const InvoicePreview = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
@@ -132,12 +160,13 @@ const InvoicePreview = () => {
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
           </Button>
-          <h1 className="text-2xl font-bold">GST Invoice Preview</h1>
+          <h1 className="text-xl md:text-2xl font-bold">GST Invoice Preview</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button 
             variant="outline" 
             onClick={() => navigate(`/invoice/edit/${id}`)}
+            className="flex-1 md:flex-none"
           >
             <Pencil className="h-4 w-4 mr-2" />
             Edit Invoice
@@ -145,12 +174,14 @@ const InvoicePreview = () => {
           <Button 
             variant="outline" 
             onClick={handleSendEmail}
+            className="flex-1 md:flex-none"
           >
             <Mail className="h-4 w-4 mr-2" />
             Send Email
           </Button>
           <Button 
             onClick={handleDownloadPDF}
+            className="flex-1 md:flex-none"
           >
             <Download className="h-4 w-4 mr-2" />
             Download PDF
@@ -163,34 +194,34 @@ const InvoicePreview = () => {
       </div>
 
       <div className="flex justify-center">
-        <div id="invoice-pdf" className="invoice-page p-8 bg-white border shadow-sm max-w-4xl w-full">
+        <div id="invoice-pdf" className="invoice-page p-4 md:p-8 bg-white border shadow-sm w-full max-w-4xl print:shadow-none print:border-none print:p-0">
           {/* Invoice Header */}
-          <div className="flex justify-between items-start mb-8">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6 md:mb-8">
             {/* Company Logo */}
-            <div>
+            <div className="text-center md:text-left">
               {invoice.logo ? (
                 <img 
                   src={invoice.logo} 
                   alt="Company logo" 
-                  className="max-h-24 object-contain"
+                  className="max-h-20 md:max-h-24 mx-auto md:mx-0 object-contain"
                 />
               ) : (
-                <div className="text-2xl font-bold">{invoice.company.name}</div>
+                <div className="text-xl md:text-2xl font-bold">{invoice.company.name}</div>
               )}
             </div>
             
             {/* Invoice Title */}
-            <div className="text-right">
-              <h1 className="text-3xl font-bold text-gray-800">TAX INVOICE</h1>
+            <div className="text-center md:text-right">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">TAX INVOICE</h1>
               <p className="text-gray-500 mt-1">#{invoice.invoiceNumber}</p>
             </div>
           </div>
 
           {/* Company and Client Info */}
-          <div className="grid grid-cols-2 gap-6 mb-8 border-t border-b py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8 border-t border-b py-4">
             <div>
               <h2 className="text-gray-700 font-semibold mb-2">Seller Details:</h2>
-              <div className="text-gray-800">
+              <div className="text-gray-800 text-sm md:text-base">
                 <p className="font-medium">{invoice.company.name}</p>
                 <p className="whitespace-pre-line">{invoice.company.address}</p>
                 {invoice.company.gstin && <p>GSTIN: {invoice.company.gstin}</p>}
@@ -200,7 +231,7 @@ const InvoicePreview = () => {
             
             <div>
               <h2 className="text-gray-700 font-semibold mb-2">Bill To:</h2>
-              <div className="text-gray-800">
+              <div className="text-gray-800 text-sm md:text-base">
                 <p className="font-medium">{invoice.client.name}</p>
                 <p className="whitespace-pre-line">{invoice.client.address}</p>
                 {invoice.client.email && <p>{invoice.client.email}</p>}
@@ -213,60 +244,68 @@ const InvoicePreview = () => {
           
           {/* Invoice Info */}
           <div className="mb-6 border-b pb-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div>
-                <p className="text-gray-600 text-sm">Invoice Date:</p>
-                <p className="font-medium">{formatDate(invoice.issueDate)}</p>
+                <p className="text-gray-600 text-xs md:text-sm">Invoice Date:</p>
+                <p className="font-medium text-sm md:text-base">{formatDate(invoice.issueDate)}</p>
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Due Date:</p>
-                <p className="font-medium">{formatDate(invoice.dueDate)}</p>
+                <p className="text-gray-600 text-xs md:text-sm">Due Date:</p>
+                <p className="font-medium text-sm md:text-base">{formatDate(invoice.dueDate)}</p>
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Payment Terms:</p>
-                <p className="font-medium">{invoice.paymentTerms}</p>
+                <p className="text-gray-600 text-xs md:text-sm">Payment Terms:</p>
+                <p className="font-medium text-sm md:text-base">{invoice.paymentTerms}</p>
               </div>
             </div>
           </div>
 
           {/* Invoice Items */}
-          <div className="mb-8">
-            <table className="w-full border-collapse">
+          <div className="mb-6 md:mb-8 overflow-x-auto">
+            <table className="w-full border-collapse text-xs md:text-sm">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="py-3 px-2 text-left text-xs border">Sr.</th>
-                  <th className="py-3 px-2 text-left text-xs border">HSN/SAC</th>
-                  <th className="py-3 px-2 text-left text-xs border">Description</th>
-                  <th className="py-3 px-2 text-right text-xs border">Qty</th>
-                  <th className="py-3 px-2 text-right text-xs border">Rate (₹)</th>
-                  <th className="py-3 px-2 text-right text-xs border">Disc %</th>
-                  <th className="py-3 px-2 text-right text-xs border">Taxable Value</th>
-                  <th className="py-3 px-2 text-right text-xs border">GST %</th>
-                  <th className="py-3 px-2 text-right text-xs border">GST Amt</th>
-                  <th className="py-3 px-2 text-right text-xs border">Total (₹)</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-left border">Sr.</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-left border">HSN/SAC</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-left border">Description</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">Qty</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">Rate (₹)</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">Disc %</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">Taxable Value</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">GST %</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">GST Amt</th>
+                  <th className="py-2 md:py-3 px-1 md:px-2 text-right border">Total (₹)</th>
                 </tr>
               </thead>
               <tbody>
                 {invoice.items.map((item, index) => {
-                  const itemDiscount = (item.amount * (item.discountPercent || 0)) / 100;
-                  const taxableValue = item.amount - itemDiscount;
+                  const baseAmount = item.quantity * item.rate;
+                  const itemDiscount = (baseAmount * (item.discountPercent || 0)) / 100;
+                  const taxableValue = baseAmount - itemDiscount;
                   const gstAmount = (taxableValue * item.gstRate) / 100;
                   const itemTotal = taxableValue + gstAmount;
                   
                   return (
                     <tr key={item.id} className="border-b">
-                      <td className="py-2 px-2 border text-sm">{index + 1}</td>
-                      <td className="py-2 px-2 border text-sm">{item.hsnCode || '-'}</td>
-                      <td className="py-2 px-2 border text-sm">{item.description}</td>
-                      <td className="py-2 px-2 text-right border text-sm">{item.quantity}</td>
-                      <td className="py-2 px-2 text-right border text-sm">₹{item.rate.toFixed(2)}</td>
-                      <td className="py-2 px-2 text-right border text-sm">
-                        {item.discountPercent ? `${item.discountPercent}%` : '-'}
+                      <td className="py-1 md:py-2 px-1 md:px-2 border">{index + 1}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 border">{item.hsnCode || '-'}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 border">{item.description}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">{item.quantity}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">₹{item.rate.toFixed(2)}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">
+                        {item.discountPercent ? (
+                          <div>
+                            <div>{item.discountPercent}%</div>
+                            {item.discountPercent > 0 && (
+                              <div className="text-xs text-gray-500">-₹{itemDiscount.toFixed(2)}</div>
+                            )}
+                          </div>
+                        ) : '-'}
                       </td>
-                      <td className="py-2 px-2 text-right border text-sm">₹{taxableValue.toFixed(2)}</td>
-                      <td className="py-2 px-2 text-right border text-sm">{item.gstRate}%</td>
-                      <td className="py-2 px-2 text-right border text-sm">₹{gstAmount.toFixed(2)}</td>
-                      <td className="py-2 px-2 text-right border text-sm">₹{itemTotal.toFixed(2)}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">₹{taxableValue.toFixed(2)}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">{item.gstRate}%</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">₹{gstAmount.toFixed(2)}</td>
+                      <td className="py-1 md:py-2 px-1 md:px-2 text-right border">₹{itemTotal.toFixed(2)}</td>
                     </tr>
                   );
                 })}
@@ -275,8 +314,8 @@ const InvoicePreview = () => {
           </div>
 
           {/* Invoice Totals */}
-          <div className="flex justify-end mb-8">
-            <div className="w-72">
+          <div className="flex justify-end mb-6 md:mb-8">
+            <div className="w-full md:w-72">
               <div className="border-t-2 pt-2">
                 <div className="flex justify-between py-1">
                   <span className="font-medium">Subtotal:</span>
@@ -327,25 +366,25 @@ const InvoicePreview = () => {
                 </div>
               </div>
               
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-2 text-xs md:text-sm text-gray-600">
                 <p className="italic">{invoice.amountInWords}</p>
               </div>
             </div>
           </div>
 
           {/* Bank Details & GST Summary */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div className="border p-4 rounded">
-              <h3 className="text-gray-700 font-semibold mb-2">Bank Details</h3>
-              <p className="text-sm">Account Name: {bankDetails?.accountName || "Not specified"}</p>
-              <p className="text-sm">Account Number: {bankDetails?.accountNumber || "Not specified"}</p>
-              <p className="text-sm">IFSC Code: {bankDetails?.ifscCode || "Not specified"}</p>
-              <p className="text-sm">Bank Name: {bankDetails?.bankName || "Not specified"}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+            <div className="border p-3 md:p-4 rounded">
+              <h3 className="text-gray-700 text-sm md:text-base font-semibold mb-2">Bank Details</h3>
+              <p className="text-xs md:text-sm">Account Name: {bankDetails?.accountName || "Not specified"}</p>
+              <p className="text-xs md:text-sm">Account Number: {bankDetails?.accountNumber || "Not specified"}</p>
+              <p className="text-xs md:text-sm">IFSC Code: {bankDetails?.ifscCode || "Not specified"}</p>
+              <p className="text-xs md:text-sm">Bank Name: {bankDetails?.bankName || "Not specified"}</p>
             </div>
             
-            <div className="border p-4 rounded">
-              <h3 className="text-gray-700 font-semibold mb-2">GST Summary</h3>
-              <table className="w-full text-sm">
+            <div className="border p-3 md:p-4 rounded">
+              <h3 className="text-gray-700 text-sm md:text-base font-semibold mb-2">GST Summary</h3>
+              <table className="w-full text-xs md:text-sm">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-1">Tax Type</th>
@@ -381,31 +420,31 @@ const InvoicePreview = () => {
           </div>
 
           {/* Notes & Terms */}
-          <div className="mt-8 space-y-6">
+          <div className="mt-6 md:mt-8 space-y-4 md:space-y-6 text-xs md:text-sm">
             {invoice.notes && (
               <div>
-                <h3 className="text-gray-700 font-semibold mb-2">Notes</h3>
-                <p className="text-gray-600 whitespace-pre-line text-sm">{invoice.notes}</p>
+                <h3 className="text-gray-700 text-sm md:text-base font-semibold mb-2">Notes</h3>
+                <p className="text-gray-600 whitespace-pre-line">{invoice.notes}</p>
               </div>
             )}
             
             {invoice.terms && (
               <div>
-                <h3 className="text-gray-700 font-semibold mb-2">Terms & Conditions</h3>
-                <p className="text-gray-600 whitespace-pre-line text-sm">{invoice.terms}</p>
+                <h3 className="text-gray-700 text-sm md:text-base font-semibold mb-2">Terms & Conditions</h3>
+                <p className="text-gray-600 whitespace-pre-line">{invoice.terms}</p>
               </div>
             )}
           </div>
 
           {/* Signature */}
-          <div className="mt-12 pt-4 flex flex-col items-end">
-            <p className="text-sm mb-12">For {invoice.company.name}</p>
-            <p className="font-medium">{invoice.company.signatory}</p>
-            <p className="text-sm text-gray-600">Authorized Signatory</p>
+          <div className="mt-8 md:mt-12 pt-4 flex flex-col items-end">
+            <p className="text-xs md:text-sm mb-8 md:mb-12">For {invoice.company.name}</p>
+            <p className="font-medium text-sm md:text-base">{invoice.company.signatory}</p>
+            <p className="text-xs md:text-sm text-gray-600">Authorized Signatory</p>
           </div>
 
           {/* Footer */}
-          <div className="mt-12 pt-4 border-t text-center text-gray-500 text-sm">
+          <div className="mt-8 md:mt-12 pt-4 border-t text-center text-gray-500 text-xs">
             <p>This is a computer-generated invoice, no signature required.</p>
           </div>
         </div>
