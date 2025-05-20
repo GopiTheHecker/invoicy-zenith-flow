@@ -8,6 +8,7 @@ const isDevelopment = window.location.hostname === 'localhost';
 const getBaseUrl = () => {
   // For specific IP addresses, use the full origin
   if (/^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)) {
+    // For IP address access, include the port
     return `${window.location.protocol}//${window.location.host}/api`;
   }
   

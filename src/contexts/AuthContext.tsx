@@ -130,8 +130,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fallback to guest login when API fails
         const guestUserData: User = {
           id: 'guest-user-id',
+          // Use email as name for guest users if provided
           email: email || 'guest@example.com',
-          name: 'Guest User',
+          name: email?.split('@')[0] || 'Guest User',
           bankDetails: {
             accountName: 'Guest User',
             accountNumber: '1234567890',

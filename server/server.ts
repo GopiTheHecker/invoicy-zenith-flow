@@ -3,6 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import { userRouter } from './routes/userRoutes';
 import { invoiceRouter } from './routes/invoiceRoutes';
 
@@ -106,6 +107,17 @@ app.use('/api/invoices', invoiceRouter);
 app.all('/api/*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
+
+// Serve static files from the React app if in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(clientBuildPath));
+  
+  // Handle React routing, return all requests to React app
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 // Connect to MongoDB with improved error handling
 mongoose.connect(MONGODB_URI)

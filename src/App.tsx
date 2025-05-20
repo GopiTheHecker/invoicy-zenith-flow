@@ -20,6 +20,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
+      retry: 1, // Reduce retries for failed queries
     },
   },
 });
@@ -45,6 +46,7 @@ const App = () => (
                 </Route>
               </Route>
               
+              {/* This catch-all route ensures any unknown route shows the NotFound page */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </InvoiceProvider>
