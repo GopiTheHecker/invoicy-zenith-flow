@@ -4,10 +4,23 @@ import axios from 'axios';
 // Use window.location.hostname to determine if we're in development or production
 const isDevelopment = window.location.hostname === 'localhost';
 
-// Set BASE_URL based on environment - using the Lovable preview URL pattern when not in development
-const BASE_URL = isDevelopment 
-  ? 'http://localhost:5000/api' 
-  : '/api'; // Changed to relative path to work in the Lovable preview environment
+// Get the base URL from the window location
+const getBaseUrl = () => {
+  // For specific IP addresses, use the full origin
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)) {
+    return `${window.location.protocol}//${window.location.host}/api`;
+  }
+  
+  // For localhost development
+  if (isDevelopment) {
+    return 'http://localhost:5000/api';
+  }
+  
+  // Default to relative path for production/preview environments
+  return '/api';
+};
+
+const BASE_URL = getBaseUrl();
 
 console.log('API Base URL:', BASE_URL);
 

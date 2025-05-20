@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ const InvoicePreview = () => {
   const navigate = useNavigate();
   const bankDetails = user?.bankDetails || getUserBankDetails();
   const isMobile = useIsMobile();
-
+  
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
@@ -53,6 +54,14 @@ const InvoicePreview = () => {
     try {
       toast.info("Generating PDF...");
       
+      // Temporarily adjust styling for PDF generation
+      const originalStyle = element.style.cssText;
+      element.style.width = "790px"; // Fixed width for PDF generation
+      element.style.maxWidth = "790px";
+      element.style.margin = "0";
+      element.style.padding = "20px";
+      element.style.boxSizing = "border-box";
+      
       // Improved PDF generation with better scale handling
       const scale = 2; // Higher scale for better quality
       const canvas = await html2canvas(element, {
@@ -60,9 +69,12 @@ const InvoicePreview = () => {
         useCORS: true,
         allowTaint: true,
         scrollY: -window.scrollY,
-        windowWidth: document.documentElement.offsetWidth,
-        windowHeight: document.documentElement.offsetHeight
+        logging: false,
+        backgroundColor: '#FFFFFF'
       });
+      
+      // Restore original styling
+      element.style.cssText = originalStyle;
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
       
@@ -292,12 +304,10 @@ const InvoicePreview = () => {
                       <td className="py-1 md:py-2 px-1 md:px-2 text-right border">{item.quantity}</td>
                       <td className="py-1 md:py-2 px-1 md:px-2 text-right border">₹{item.rate.toFixed(2)}</td>
                       <td className="py-1 md:py-2 px-1 md:px-2 text-right border">
-                        {item.discountPercent ? (
+                        {item.discountPercent > 0 ? (
                           <div>
                             <div>{item.discountPercent}%</div>
-                            {item.discountPercent > 0 && (
-                              <div className="text-xs text-gray-500">-₹{itemDiscount.toFixed(2)}</div>
-                            )}
+                            <div className="text-xs text-gray-500">-₹{itemDiscount.toFixed(2)}</div>
                           </div>
                         ) : '-'}
                       </td>
