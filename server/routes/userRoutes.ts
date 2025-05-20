@@ -133,6 +133,9 @@ router.post('/login', async (req, res) => {
     // Generate JWT token
     const token = generateToken(user._id.toString(), user.email);
 
+    // Set explicit Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     res.json({
       _id: user._id,
       name: user.name,

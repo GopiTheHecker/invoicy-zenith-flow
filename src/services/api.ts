@@ -42,7 +42,11 @@ const isHtmlResponse = (data, headers) => {
     return true;
   }
   
-  if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE html>')) {
+  if (typeof data === 'string' && (
+    data.trim().startsWith('<!DOCTYPE html>') || 
+    data.trim().startsWith('<html') || 
+    data.trim().includes('</html>')
+  )) {
     return true;
   }
   

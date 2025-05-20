@@ -26,7 +26,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Always set Content-Type to application/json for API responses
-app.use((req, res, next) => {
+app.use('/api', (req, res, next) => {
   // Skip for OPTIONS requests
   if (req.method !== 'OPTIONS') {
     res.header('Content-Type', 'application/json');
@@ -62,8 +62,8 @@ app.use((req, res, next) => {
     }
     
     // CRITICAL: Ensure response has proper Content-Type for API routes
-    // This prevents HTML responses from being sent
-    if (req.url.startsWith('/api/')) {
+    // This prevents HTML responses from being sent for API requests
+    if (req.path.startsWith('/api/')) {
       res.header('Content-Type', 'application/json');
     }
     
