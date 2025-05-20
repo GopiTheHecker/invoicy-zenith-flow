@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -71,7 +70,7 @@ const InvoicePreview = () => {
       const imgWidth = 210; // A4 width in mm
       const pageHeight = 297; // A4 height in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const heightLeft = imgHeight;
+      let heightLeft = imgHeight; // Changed from const to let
       
       const pdf = new jsPDF({
         orientation: 'portrait',
