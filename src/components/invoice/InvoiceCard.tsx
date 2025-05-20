@@ -26,12 +26,35 @@ const getStatusColor = (status: string) => {
 };
 
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
+  try {
+    // Check if the string is a valid date
+    if (!dateString) return "Invalid date";
+    
+    // Handle ISO format dates
+    if (/^\d{4}-\d{2}-\d{2}.*/.test(dateString)) {
+      const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+      return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(new Date(year, month - 1, day));
+    }
+
+    // For other formats, try direct parsing
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "Invalid date";
+    }
+    
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(date);
+  } catch (error) {
+    console.error("Date formatting error:", error, "for date:", dateString);
+    return "Invalid date";
+  }
 };
 
 export const InvoiceCard = ({ invoice }: InvoiceCardProps) => {

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -89,23 +88,34 @@ const InvoicePreview = () => {
 
   const formatDate = (dateString: string) => {
     try {
+      // Skip processing if null or undefined
+      if (!dateString) return '';
+      
       // First check if the date is in YYYY-MM-DD format
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
         const [year, month, day] = dateString.split('-').map(Number);
         return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
       }
       
-      // Otherwise try to parse it as ISO string
+      // For ISO format with timestamp
+      if (/^\d{4}-\d{2}-\d{2}T/.test(dateString)) {
+        const [datePart] = dateString.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+      }
+      
+      // Otherwise try to parse it as any date string
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        // If invalid, return the original string
-        return dateString;
+        // If invalid, log error and return empty string
+        console.error("Invalid date format:", dateString);
+        return '';
       }
       
       return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     } catch (error) {
       console.error("Date formatting error:", error);
-      return dateString; // Return original string if any error occurs
+      return ''; // Return empty string if any error occurs
     }
   };
 
