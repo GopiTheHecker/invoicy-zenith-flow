@@ -15,6 +15,10 @@ type User = {
   id: string;
   email: string;
   name: string;
+  companyName?: string;
+  gstNumber?: string;
+  contactPerson?: string;
+  mobileNumber?: string;
   bankDetails?: BankDetails;
 };
 
@@ -23,13 +27,17 @@ export interface UserResponse {
   name: string;
   email: string;
   token: string;
+  companyName?: string;
+  gstNumber?: string;
+  contactPerson?: string;
+  mobileNumber?: string;
   bankDetails?: BankDetails;
 }
 
 type AuthContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, companyName: string, gstNumber?: string, contactPerson?: string, mobileNumber?: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
   updateUserProfile: (data: Partial<User>) => void;
@@ -80,6 +88,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: 'guest-user-id',
           email: 'guest@example.com',
           name: 'Guest User',
+          companyName: 'Guest Company',
+          gstNumber: 'GUEST12345',
+          contactPerson: 'Guest User',
+          mobileNumber: '9999999999',
           bankDetails: {
             accountName: 'Guest User',
             accountNumber: '1234567890',
@@ -112,6 +124,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: response._id,
           email: response.email,
           name: response.name,
+          companyName: response.companyName,
+          gstNumber: response.gstNumber,
+          contactPerson: response.contactPerson,
+          mobileNumber: response.mobileNumber,
           bankDetails: response.bankDetails
         };
         
@@ -133,6 +149,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Use email as name for guest users if provided
           email: email || 'guest@example.com',
           name: email?.split('@')[0] || 'Guest User',
+          companyName: 'Guest Company',
+          gstNumber: 'GUEST12345',
+          contactPerson: email?.split('@')[0] || 'Guest User',
+          mobileNumber: '9999999999',
           bankDetails: {
             accountName: 'Guest User',
             accountNumber: '1234567890',
@@ -162,12 +182,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+  const register = async (
+    name: string, 
+    email: string, 
+    password: string, 
+    companyName: string,
+    gstNumber?: string,
+    contactPerson?: string,
+    mobileNumber?: string
+  ): Promise<boolean> => {
     try {
       setIsLoading(true);
       
       try {
-        const response = await authService.register({ name, email, password });
+        const response = await authService.register({ 
+          name, 
+          email, 
+          password,
+          companyName,
+          gstNumber,
+          contactPerson,
+          mobileNumber
+        });
         
         if (!response || !response._id) {
           throw new Error("Invalid response from server");
@@ -178,6 +214,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: response._id,
           email: response.email,
           name: response.name,
+          companyName: response.companyName,
+          gstNumber: response.gstNumber,
+          contactPerson: response.contactPerson,
+          mobileNumber: response.mobileNumber,
           bankDetails: response.bankDetails
         };
         
@@ -198,6 +238,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: 'guest-user-id',
           email: email,
           name: name,
+          companyName: companyName,
+          gstNumber: gstNumber,
+          contactPerson: contactPerson,
+          mobileNumber: mobileNumber
         };
         
         localStorage.setItem('user', JSON.stringify(guestUserData));

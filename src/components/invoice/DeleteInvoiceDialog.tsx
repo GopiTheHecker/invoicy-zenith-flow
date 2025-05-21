@@ -19,12 +19,18 @@ interface DeleteInvoiceDialogProps {
   invoiceId: string;
   invoiceNumber: string;
   onDeleted?: () => void;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
+  icon?: React.ReactNode;
 }
 
 export const DeleteInvoiceDialog = ({ 
   invoiceId, 
   invoiceNumber,
-  onDeleted 
+  onDeleted,
+  variant = "destructive",
+  size = "sm",
+  icon = <Trash2 className="h-4 w-4 mr-1" />
 }: DeleteInvoiceDialogProps) => {
   const { deleteInvoice } = useInvoices();
   
@@ -38,8 +44,8 @@ export const DeleteInvoiceDialog = ({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm">
-          <Trash2 className="h-4 w-4 mr-1" /> Delete
+        <Button variant={variant} size={size}>
+          {icon} Delete
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
