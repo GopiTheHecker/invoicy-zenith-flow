@@ -191,9 +191,7 @@ const Dashboard = () => {
             </>
           )}
           
-          <div className="mt-6 text-center text-xs text-gray-500">
-            © Spark Invotech Pvt Ltd. All Rights Reserved.
-          </div>
+        
         </div>
       </div>
     </div>
