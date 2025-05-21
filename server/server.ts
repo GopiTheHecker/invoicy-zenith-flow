@@ -25,15 +25,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Always set Content-Type to application/json for API responses
-app.use('/api', (req, res, next) => {
-  // Skip for OPTIONS requests
-  if (req.method !== 'OPTIONS') {
-    res.header('Content-Type', 'application/json');
-  }
-  next();
-});
-
 // Add logging middleware for debugging requests
 app.use((req, res, next) => {
   const start = Date.now();
@@ -61,12 +52,6 @@ app.use((req, res, next) => {
       console.log('Response body: [Large response, not logged]');
     }
     
-    // CRITICAL: Ensure response has proper Content-Type for API routes
-    // This prevents HTML responses from being sent for API requests
-    if (req.path.startsWith('/api/')) {
-      res.header('Content-Type', 'application/json');
-    }
-    
     return originalSend.call(this, body);
   };
   
@@ -75,6 +60,13 @@ app.use((req, res, next) => {
 
 // Handle preflight OPTIONS requests properly
 app.options('*', cors());
+
+// CRITICAL: Set Content-Type header for all API routes
+// This must come BEFORE route handlers
+app.use('/api', (req, res, next) => {
+  res.header('Content-Type', 'application/json');
+  next();
+});
 
 // Wrap all route handlers in try-catch to prevent HTML error responses
 const wrapAsync = (fn) => {
@@ -108,6 +100,7 @@ app.all('/api/*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
+// IMPORTANT: Static file serving must come AFTER all API routes
 // Serve static files from the React app if in production
 if (process.env.NODE_ENV === 'production') {
   const clientBuildPath = path.join(__dirname, '..', 'dist');

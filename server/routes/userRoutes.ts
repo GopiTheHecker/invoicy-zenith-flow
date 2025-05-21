@@ -29,11 +29,18 @@ router.post('/check-email', async (req, res) => {
 
     const user = await User.findOne({ email });
     
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     return res.json({ 
       exists: !!user 
     });
   } catch (error: any) {
     console.error('Check email error:', error);
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     return res.status(500).json({ 
       message: error.message || 'Failed to check email',
       error: process.env.NODE_ENV === 'development' ? error : undefined
@@ -49,6 +56,10 @@ router.post('/register', async (req, res) => {
 
     if (!name || !email || !password) {
       console.log('Registration missing required fields');
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
@@ -56,6 +67,10 @@ router.post('/register', async (req, res) => {
     const userExists = await User.findOne({ email });
     if (userExists) {
       console.log('User already exists with email:', email);
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(400).json({ message: 'User already exists' });
     }
 
@@ -71,6 +86,9 @@ router.post('/register', async (req, res) => {
 
       // Generate JWT token
       const token = generateToken(user._id.toString(), user.email);
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
 
       res.status(201).json({
         _id: user._id,
@@ -80,6 +98,9 @@ router.post('/register', async (req, res) => {
       });
     } catch (dbError: any) {
       console.error('Database error during user creation:', dbError);
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
       
       // Check for validation errors
       if (dbError.name === 'ValidationError') {
@@ -96,6 +117,10 @@ router.post('/register', async (req, res) => {
     }
   } catch (error: any) {
     console.error('Registration error:', error);
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     return res.status(500).json({ 
       message: error.message || 'Registration failed',
       error: process.env.NODE_ENV === 'development' ? error : undefined
@@ -111,6 +136,10 @@ router.post('/login', async (req, res) => {
 
     if (!email || !password) {
       console.log('Login missing required fields');
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
@@ -118,6 +147,10 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       console.log('User not found with email:', email);
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -125,6 +158,10 @@ router.post('/login', async (req, res) => {
     const isPasswordMatch = await user.comparePassword(password);
     if (!isPasswordMatch) {
       console.log('Password does not match for user:', email);
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -145,6 +182,10 @@ router.post('/login', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Login error:', error);
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     res.status(500).json({ 
       message: error.message || 'Login failed',
       error: process.env.NODE_ENV === 'development' ? error : undefined
@@ -159,11 +200,23 @@ router.get('/profile', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       console.log('User not found with ID:', req.user.id);
+      
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(404).json({ message: 'User not found' });
     }
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     res.json(user);
   } catch (error: any) {
     console.error('Profile error:', error);
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     res.status(500).json({ 
       message: error.message || 'Failed to get user profile',
       error: process.env.NODE_ENV === 'development' ? error : undefined  
@@ -177,6 +230,9 @@ router.put('/bank-details', authMiddleware, async (req, res) => {
     const { accountName, accountNumber, ifscCode, bankName } = req.body;
     
     if (!accountName || !accountNumber || !ifscCode || !bankName) {
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(400).json({ message: 'Please provide all bank details' });
     }
     
@@ -194,12 +250,22 @@ router.put('/bank-details', authMiddleware, async (req, res) => {
     ).select('-password');
     
     if (!updatedUser) {
+      // Ensure we set the Content-Type header
+      res.setHeader('Content-Type', 'application/json');
+      
       return res.status(404).json({ message: 'User not found' });
     }
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
     
     res.json(updatedUser);
   } catch (error: any) {
     console.error('Update bank details error:', error);
+    
+    // Ensure we set the Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     res.status(500).json({ 
       message: error.message || 'Failed to update bank details',
       error: process.env.NODE_ENV === 'development' ? error : undefined  

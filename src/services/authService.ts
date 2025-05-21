@@ -39,7 +39,7 @@ export const authService = {
         return false;
       }
       
-      const response = await api.post('/api/users/check-email', { email });
+      const response = await api.post('/users/check-email', { email });
       
       // Check if the response has the expected format
       if (response.data && typeof response.data.exists === 'boolean') {
@@ -68,7 +68,7 @@ export const authService = {
       }
       
       // Make sure we're using the correct endpoint
-      const response = await api.post('/api/users/login', data);
+      const response = await api.post('/users/login', data);
       
       console.log('Login response:', response.data);
       return response.data;
@@ -120,7 +120,7 @@ export const authService = {
       }
       
       // Make sure we're using the correct endpoint
-      const response = await api.post('/api/users/register', data);
+      const response = await api.post('/users/register', data);
       
       console.log('Register response:', response.data);
       return response.data;
@@ -152,7 +152,7 @@ export const authService = {
   
   async getProfile(): Promise<UserResponse> {
     try {
-      const response = await api.get('/api/users/profile');
+      const response = await api.get('/users/profile');
       return response.data;
     } catch (error) {
       console.error('Get profile API error:', error);
@@ -162,7 +162,7 @@ export const authService = {
   
   async updateBankDetails(bankDetails: BankDetails): Promise<UserResponse> {
     try {
-      const response = await api.put('/api/users/bank-details', bankDetails);
+      const response = await api.put('/users/bank-details', bankDetails);
       return response.data;
     } catch (error) {
       console.error('Update bank details API error:', error);

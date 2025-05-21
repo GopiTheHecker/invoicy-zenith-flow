@@ -65,6 +65,11 @@ api.interceptors.request.use(
     config.headers.Accept = 'application/json';
     config.headers['Content-Type'] = 'application/json';
     
+    // Make sure URLs don't have double /api prefixes
+    if (config.url && config.url.startsWith('/api/')) {
+      config.url = config.url.substring(4); // Remove the /api prefix as it's already in baseURL
+    }
+    
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data);
     return config;
   },
