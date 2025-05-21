@@ -174,7 +174,7 @@ const Dashboard = () => {
                   </p>
                 </div>
               ) : (
-                <>
+                <Tabs value={viewMode} className="w-full">
                   <TabsContent value="cards" className="mt-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredInvoices.map((invoice) => (
@@ -186,7 +186,7 @@ const Dashboard = () => {
                   <TabsContent value="table" className="mt-0">
                     <InvoiceTable invoices={filteredInvoices} />
                   </TabsContent>
-                </>
+                </Tabs>
               )}
             </>
           )}
