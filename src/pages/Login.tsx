@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, User, Mail, Lock } from "lucide-react";
+import { FileText, User, Mail, Lock, Building, CreditCard, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 const Login = () => {
@@ -20,6 +20,10 @@ const Login = () => {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
@@ -61,10 +65,23 @@ const Login = () => {
       return;
     }
     
+    if (!companyName) {
+      toast.error("Company name is required");
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
-      const success = await register(registerName, registerEmail, registerPassword);
+      const success = await register(
+        registerName, 
+        registerEmail, 
+        registerPassword, 
+        companyName, 
+        gstNumber, 
+        contactPerson, 
+        mobileNumber
+      );
       if (success) {
         // Add a small delay to ensure state updates before navigation
         setTimeout(() => {
@@ -179,7 +196,7 @@ const Login = () => {
           
           <TabsContent value="register">
             <form onSubmit={handleRegisterSubmit}>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>
                   <div className="relative">
@@ -207,6 +224,63 @@ const Login = () => {
                       onChange={(e) => setRegisterEmail(e.target.value)}
                       className="pl-10"
                       required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-name">Company Name</Label>
+                  <div className="relative">
+                    <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="company-name"
+                      type="text"
+                      placeholder="Your Company Ltd."
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gst-number">GST Number (Optional)</Label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="gst-number"
+                      type="text"
+                      placeholder="GST Number"
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact-person">Contact Person (Optional)</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="contact-person"
+                      type="text"
+                      placeholder="Contact Person Name"
+                      value={contactPerson}
+                      onChange={(e) => setContactPerson(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mobile-number">Mobile Number (Optional)</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="mobile-number"
+                      type="text"
+                      placeholder="Mobile Number"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      className="pl-10"
                     />
                   </div>
                 </div>
@@ -255,6 +329,9 @@ const Login = () => {
             </form>
           </TabsContent>
         </Tabs>
+        <div className="text-center pb-4 text-xs text-gray-500">
+          © Spark Invotech Pvt Ltd. All Rights Reserved.
+        </div>
       </Card>
     </div>
   );

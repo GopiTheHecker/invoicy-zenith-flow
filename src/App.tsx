@@ -43,6 +43,9 @@ const App = () => (
                   <Route path="/invoice/edit/:id" element={<InvoiceGenerator />} />
                   <Route path="/invoice/preview/:id" element={<InvoicePreview />} />
                   <Route path="/profile" element={<Profile />} />
+                  {/* New routes for navigation items */}
+                  <Route path="/reports" element={<Dashboard />} /> {/* Placeholder - will be implemented later */}
+                  <Route path="/settings" element={<Profile />} /> {/* Placeholder - will be implemented later */}
                 </Route>
               </Route>
               

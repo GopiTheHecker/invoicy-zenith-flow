@@ -6,6 +6,10 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
+  companyName: string;
+  gstNumber?: string;
+  contactPerson?: string;
+  mobileNumber?: string;
   bankDetails?: {
     accountName: string;
     accountNumber: string;
@@ -30,6 +34,19 @@ const userSchema = new Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: 6
+  },
+  companyName: {
+    type: String,
+    required: [true, 'Company name is required']
+  },
+  gstNumber: {
+    type: String
+  },
+  contactPerson: {
+    type: String
+  },
+  mobileNumber: {
+    type: String
   },
   bankDetails: {
     accountName: String,

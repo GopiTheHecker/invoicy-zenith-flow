@@ -52,9 +52,17 @@ router.post('/check-email', async (req, res) => {
 router.post('/register', async (req, res) => {
   try {
     console.log('Register route hit with data:', req.body);
-    const { name, email, password } = req.body;
+    const { 
+      name, 
+      email, 
+      password, 
+      companyName,
+      gstNumber,
+      contactPerson,
+      mobileNumber
+    } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !companyName) {
       console.log('Registration missing required fields');
       
       // Ensure we set the Content-Type header
@@ -79,7 +87,11 @@ router.post('/register', async (req, res) => {
       const user = await User.create({
         name,
         email,
-        password
+        password,
+        companyName,
+        gstNumber,
+        contactPerson,
+        mobileNumber
       });
 
       console.log('User created successfully with ID:', user._id);
@@ -94,6 +106,10 @@ router.post('/register', async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        companyName: user.companyName,
+        gstNumber: user.gstNumber,
+        contactPerson: user.contactPerson,
+        mobileNumber: user.mobileNumber,
         token
       });
     } catch (dbError: any) {
@@ -177,6 +193,10 @@ router.post('/login', async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      companyName: user.companyName,
+      gstNumber: user.gstNumber,
+      contactPerson: user.contactPerson,
+      mobileNumber: user.mobileNumber,
       bankDetails: user.bankDetails || null,
       token
     });

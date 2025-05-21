@@ -11,6 +11,10 @@ interface RegisterData {
   name: string;
   email: string;
   password: string;
+  companyName: string;
+  gstNumber?: string;
+  contactPerson?: string;
+  mobileNumber?: string;
 }
 
 interface BankDetails {
@@ -25,6 +29,10 @@ interface UserResponse {
   name: string;
   email: string;
   token: string;
+  companyName: string;
+  gstNumber?: string;
+  contactPerson?: string;
+  mobileNumber?: string;
   bankDetails?: BankDetails;
 }
 

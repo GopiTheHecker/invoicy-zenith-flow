@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, FileText, LogOut, User } from "lucide-react";
+import { Menu, FileText, LogOut, UserIcon, PlusSquare, BarChart2, Settings } from "lucide-react";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -30,20 +30,50 @@ const Navbar = () => {
             <span className="text-xl font-bold text-gray-900">InvoiceGen</span>
           </Link>
 
-          <div className="flex items-center">
+          <div className="flex items-center space-x-1">
             <Button
               variant="ghost"
-              className="mr-2 hidden md:flex"
+              size="sm"
+              className="hidden md:flex"
               asChild
             >
-              <Link to="/dashboard">Dashboard</Link>
+              <Link to="/dashboard">
+                <FileText className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Dashboard</span>
+              </Link>
             </Button>
             <Button
               variant="ghost"
-              className="mr-2 hidden md:flex"
+              size="sm"
+              className="hidden md:flex"
               asChild
             >
-              <Link to="/invoice/new">New Invoice</Link>
+              <Link to="/invoice/new">
+                <PlusSquare className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Create Bill</span>
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden md:flex"
+              asChild
+            >
+              <Link to="/reports">
+                <BarChart2 className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Reports</span>
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden md:flex"
+              asChild
+            >
+              <Link to="/settings">
+                <Settings className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Settings</span>
+              </Link>
             </Button>
 
             <DropdownMenu>
@@ -61,8 +91,16 @@ const Navbar = () => {
                   Dashboard
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/invoice/new")}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  New Invoice
+                  <PlusSquare className="h-4 w-4 mr-2" />
+                  Create Bill
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/reports")}>
+                  <BarChart2 className="h-4 w-4 mr-2" />
+                  Reports
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/profile")}>
+                  <UserIcon className="h-4 w-4 mr-2" />
+                  Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer text-red-500" onClick={handleLogout}>
