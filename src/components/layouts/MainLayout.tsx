@@ -14,7 +14,7 @@ const MainLayout = () => {
       </main>
       <footer className="py-4 bg-white border-t">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          &copy; {new Date().getFullYear()} InvoiceGen - All rights reserved.
+          &copy; {new Date().getFullYear()} Spark Innovation - All rights reserved.
         </div>
       </footer>
     </div>

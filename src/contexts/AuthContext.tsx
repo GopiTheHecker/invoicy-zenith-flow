@@ -9,7 +9,7 @@ interface BankDetails {
   accountNumber: string;
   ifscCode: string;
   bankName: string;
-  [key: string]: string; // Add index signature for Json compatibility
+  [key: string]: string;
 }
 
 interface UserProfile {
@@ -54,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session);
         setSession(session);
         
         if (session?.user) {
@@ -68,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
       setSession(session);
       if (session?.user) {
         fetchUserProfile(session.user);
@@ -138,19 +140,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting login for:', email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
+      console.log('Login response:', { data, error });
+
       if (error) {
-        toast.error(error.message);
+        if (error.message.includes('Email not confirmed')) {
+          toast.error('Please check your email and click the confirmation link before logging in.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          toast.error('Invalid email or password. Please check your credentials.');
+        } else {
+          toast.error(error.message);
+        }
+        return false;
+      }
+
+      if (data.user && !data.user.email_confirmed_at) {
+        toast.error('Please confirm your email address before logging in.');
         return false;
       }
 
       toast.success('Logged in successfully');
       return true;
     } catch (error: any) {
+      console.error('Login error:', error);
       toast.error(error.message || 'Login failed');
       return false;
     }
@@ -166,10 +184,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     mobileNumber?: string
   ): Promise<boolean> => {
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('Attempting registration for:', email);
+      
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             name,
             company_name: companyName || ''
@@ -177,14 +198,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
+      console.log('Registration response:', { data, error });
+
       if (error) {
         toast.error(error.message);
         return false;
       }
 
-      toast.success('Account created successfully');
+      if (data.user && !data.user.email_confirmed_at) {
+        toast.success('Account created! Please check your email and click the confirmation link to complete registration.');
+      } else {
+        toast.success('Account created successfully');
+      }
+      
       return true;
     } catch (error: any) {
+      console.error('Registration error:', error);
       toast.error(error.message || 'Registration failed');
       return false;
     }
