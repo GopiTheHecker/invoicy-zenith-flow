@@ -94,7 +94,10 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const { user } = useAuth();
 
+  console.log('InvoiceProvider rendered, user:', user);
+
   useEffect(() => {
+    console.log('InvoiceProvider useEffect triggered, user:', user);
     if (user?.id && user.id !== 'guest-user-id') {
       fetchInvoices();
     } else if (user?.id === 'guest-user-id') {
@@ -164,6 +167,9 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createInvoice = async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
     try {
+      console.log('Creating invoice with user:', user);
+      console.log('Invoice data:', invoiceData);
+      
       // For guest users, store in localStorage
       if (user?.id === 'guest-user-id') {
         const newId = `guest-invoice-${Date.now()}`;
@@ -188,11 +194,17 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return newInvoice;
       }
 
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Attempting to save to Supabase for user:', user.id);
+
       // For authenticated users, save to Supabase
       const { data, error } = await supabase
         .from('invoices')
         .insert({
-          user_id: user?.id,
+          user_id: user.id,
           invoice_number: invoiceData.invoiceNumber,
           issue_date: invoiceData.issueDate,
           due_date: invoiceData.dueDate,
@@ -217,9 +229,11 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
 
+      console.log('Supabase insert response:', { data, error });
+
       if (error) {
         console.error('Error creating invoice:', error);
-        toast.error('Failed to create invoice');
+        toast.error('Failed to create invoice: ' + error.message);
         throw error;
       }
 
@@ -229,8 +243,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       toast.success("Invoice created successfully!");
       return newInvoice;
     } catch (error: any) {
-      toast.error("Failed to create invoice");
-      console.error(error);
+      console.error('Invoice creation error:', error);
+      toast.error("Failed to create invoice: " + (error.message || 'Unknown error'));
       throw error;
     }
   };
