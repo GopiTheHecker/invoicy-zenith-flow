@@ -9,6 +9,7 @@ interface BankDetails {
   accountNumber: string;
   ifscCode: string;
   bankName: string;
+  [key: string]: string; // Add index signature for Json compatibility
 }
 
 interface UserProfile {
@@ -25,8 +26,8 @@ interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   session: Session | null;
-  login: (email: string, password: string) => Promise<{ error: string | null }>;
-  register: (data: { name: string; email: string; password: string; companyName?: string; gstNumber?: string; contactPerson?: string; mobileNumber?: string }) => Promise<{ error: string | null }>;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, companyName: string, gstNumber?: string, contactPerson?: string, mobileNumber?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<{ error: string | null }>;
   updateBankDetails: (bankDetails: BankDetails) => Promise<{ error: string | null }>;
@@ -100,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           gstNumber: data.gst_number,
           contactPerson: data.contact_person,
           mobileNumber: data.mobile_number,
-          bankDetails: data.bank_details
+          bankDetails: data.bank_details as BankDetails | undefined
         });
       } else {
         // Create profile if it doesn't exist
@@ -126,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             gstNumber: newProfile.gst_number,
             contactPerson: newProfile.contact_person,
             mobileNumber: newProfile.mobile_number,
-            bankDetails: newProfile.bank_details
+            bankDetails: newProfile.bank_details as BankDetails | undefined
           });
         }
       }
@@ -135,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -143,35 +144,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        return { error: error.message };
+        toast.error(error.message);
+        return false;
       }
 
-      return { error: null };
+      toast.success('Logged in successfully');
+      return true;
     } catch (error: any) {
-      return { error: error.message || 'Login failed' };
+      toast.error(error.message || 'Login failed');
+      return false;
     }
   };
 
-  const register = async (data: { name: string; email: string; password: string; companyName?: string; gstNumber?: string; contactPerson?: string; mobileNumber?: string }) => {
+  const register = async (
+    name: string, 
+    email: string, 
+    password: string, 
+    companyName: string, 
+    gstNumber?: string, 
+    contactPerson?: string, 
+    mobileNumber?: string
+  ): Promise<boolean> => {
     try {
       const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
+        email,
+        password,
         options: {
           data: {
-            name: data.name,
-            company_name: data.companyName || ''
+            name,
+            company_name: companyName || ''
           }
         }
       });
 
       if (error) {
-        return { error: error.message };
+        toast.error(error.message);
+        return false;
       }
 
-      return { error: null };
+      toast.success('Account created successfully');
+      return true;
     } catch (error: any) {
-      return { error: error.message || 'Registration failed' };
+      toast.error(error.message || 'Registration failed');
+      return false;
     }
   };
 
@@ -180,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
+      toast.success('Logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -218,7 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { error } = await supabase
         .from('profiles')
-        .update({ bank_details: bankDetails })
+        .update({ bank_details: bankDetails as any })
         .eq('id', user.id);
 
       if (error) {

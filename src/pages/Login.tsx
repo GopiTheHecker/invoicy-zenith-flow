@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, User, Mail, Lock, Building, CreditCard, Phone } from "lucide-react";
-import { toast } from "sonner";
 
 const Login = () => {
   // Login form state
@@ -28,7 +26,7 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   
-  const { login, register, user } = useAuth();
+  const { login, register, user, loginAsGuest } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,7 +45,6 @@ const Login = () => {
     try {
       const success = await login(email, password);
       if (success) {
-        // Add a small delay to ensure state updates before navigation
         setTimeout(() => {
           navigate(from, { replace: true });
         }, 100);
@@ -61,12 +58,12 @@ const Login = () => {
     e.preventDefault();
     
     if (registerPassword !== confirmPassword) {
-      toast.error("Passwords don't match");
+      alert("Passwords don't match");
       return;
     }
     
     if (!companyName) {
-      toast.error("Company name is required");
+      alert("Company name is required");
       return;
     }
     
@@ -83,7 +80,6 @@ const Login = () => {
         mobileNumber
       );
       if (success) {
-        // Add a small delay to ensure state updates before navigation
         setTimeout(() => {
           navigate(from, { replace: true });
         }, 100);
@@ -95,16 +91,11 @@ const Login = () => {
   
   const handleGuestLogin = () => {
     setIsSubmitting(true);
-    // Use predefined guest credentials
-    login("guest@example.com", "guest123").then(success => {
-      if (success) {
-        setTimeout(() => {
-          navigate(from, { replace: true });
-        }, 100);
-      }
-    }).finally(() => {
-      setIsSubmitting(false);
-    });
+    loginAsGuest();
+    setTimeout(() => {
+      navigate(from, { replace: true });
+    }, 100);
+    setIsSubmitting(false);
   };
 
   return (

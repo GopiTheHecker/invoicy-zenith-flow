@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from '@/contexts/AuthContext';
 
 const Profile = () => {
-  const { user, updateUserProfile, updateBankDetails, logout } = useAuth();
+  const { user, updateProfile, updateBankDetails, logout } = useAuth();
   
   const [accountName, setAccountName] = useState(user?.bankDetails?.accountName || '');
   const [accountNumber, setAccountNumber] = useState(user?.bankDetails?.accountNumber || '');
@@ -34,10 +34,12 @@ const Profile = () => {
         bankName
       };
       
-      const success = await updateBankDetails(bankDetails);
+      const { error } = await updateBankDetails(bankDetails);
       
-      if (success) {
+      if (!error) {
         toast.success("Bank details updated successfully");
+      } else {
+        toast.error(error);
       }
     } catch (error) {
       console.error("Error updating bank details:", error);
