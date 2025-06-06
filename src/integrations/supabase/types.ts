@@ -9,7 +9,123 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      invoices: {
+        Row: {
+          amount_in_words: string
+          client: Json
+          company: Json
+          created_at: string
+          discount: number
+          due_date: string
+          id: string
+          invoice_number: string
+          issue_date: string
+          items: Json
+          logo: string | null
+          notes: string | null
+          payment_terms: string | null
+          rounded_total: number
+          status: string
+          subtotal: number
+          terms: string | null
+          total: number
+          total_cgst: number
+          total_gst: number
+          total_igst: number
+          total_sgst: number
+          user_id: string
+        }
+        Insert: {
+          amount_in_words: string
+          client: Json
+          company: Json
+          created_at?: string
+          discount?: number
+          due_date: string
+          id?: string
+          invoice_number: string
+          issue_date: string
+          items: Json
+          logo?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          rounded_total: number
+          status?: string
+          subtotal: number
+          terms?: string | null
+          total: number
+          total_cgst: number
+          total_gst: number
+          total_igst: number
+          total_sgst: number
+          user_id: string
+        }
+        Update: {
+          amount_in_words?: string
+          client?: Json
+          company?: Json
+          created_at?: string
+          discount?: number
+          due_date?: string
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          items?: Json
+          logo?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          rounded_total?: number
+          status?: string
+          subtotal?: number
+          terms?: string | null
+          total?: number
+          total_cgst?: number
+          total_gst?: number
+          total_igst?: number
+          total_sgst?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          bank_details: Json | null
+          company_name: string | null
+          contact_person: string | null
+          created_at: string
+          email: string
+          gst_number: string | null
+          id: string
+          mobile_number: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bank_details?: Json | null
+          company_name?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email: string
+          gst_number?: string | null
+          id: string
+          mobile_number?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bank_details?: Json | null
+          company_name?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string
+          gst_number?: string | null
+          id?: string
+          mobile_number?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

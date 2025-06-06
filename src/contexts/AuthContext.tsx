@@ -1,32 +1,20 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from "sonner";
-import { authService } from '@/services/authService';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
-type BankDetails = {
+interface BankDetails {
   accountName: string;
   accountNumber: string;
   ifscCode: string;
   bankName: string;
-};
+}
 
-type User = {
+interface UserProfile {
   id: string;
-  email: string;
-  name: string;
-  companyName?: string;
-  gstNumber?: string;
-  contactPerson?: string;
-  mobileNumber?: string;
-  bankDetails?: BankDetails;
-};
-
-export interface UserResponse {
-  _id: string;
   name: string;
   email: string;
-  token: string;
   companyName?: string;
   gstNumber?: string;
   contactPerson?: string;
@@ -34,15 +22,17 @@ export interface UserResponse {
   bankDetails?: BankDetails;
 }
 
-type AuthContextType = {
-  user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, companyName: string, gstNumber?: string, contactPerson?: string, mobileNumber?: string) => Promise<boolean>;
-  logout: () => void;
-  isLoading: boolean;
-  updateUserProfile: (data: Partial<User>) => void;
-  updateBankDetails: (bankDetails: BankDetails) => Promise<boolean>;
-};
+interface AuthContextType {
+  user: UserProfile | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  register: (data: { name: string; email: string; password: string; companyName?: string; gstNumber?: string; contactPerson?: string; mobileNumber?: string }) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<{ error: string | null }>;
+  updateBankDetails: (bankDetails: BankDetails) => Promise<{ error: string | null }>;
+  loading: boolean;
+  loginAsGuest: () => void;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -55,302 +45,215 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is stored in localStorage
-    const token = localStorage.getItem('token');
-    if (token) {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (error) {
-          // Handle potential JSON parse error
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchUserProfile(session.user);
+        } else {
+          setUser(null);
         }
+        
+        setLoading(false);
       }
-    }
-    setIsLoading(false);
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        fetchUserProfile(session.user);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const fetchUserProfile = async (authUser: User) => {
     try {
-      setIsLoading(true);
-      
-      // Special handling for guest login
-      if (email === 'guest@example.com' && password === 'guest123') {
-        // Create guest user data without backend call
-        const guestUserData: User = {
-          id: 'guest-user-id',
-          email: 'guest@example.com',
-          name: 'Guest User',
-          companyName: 'Guest Company',
-          gstNumber: 'GUEST12345',
-          contactPerson: 'Guest User',
-          mobileNumber: '9999999999',
-          bankDetails: {
-            accountName: 'Guest User',
-            accountNumber: '1234567890',
-            ifscCode: 'GUEST001',
-            bankName: 'Guest Bank'
-          }
-        };
-        
-        // Set to localStorage
-        localStorage.setItem('user', JSON.stringify(guestUserData));
-        localStorage.setItem('token', 'guest-token');
-        
-        // Update state
-        setUser(guestUserData);
-        
-        toast.success("Logged in as Guest");
-        return true;
-      }
-      
-      // Regular login flow
-      try {
-        const response = await authService.login({ email, password });
-        
-        if (!response || !response._id) {
-          throw new Error("Invalid response from server");
-        }
-        
-        // Save to state and localStorage
-        const userData: User = {
-          id: response._id,
-          email: response.email,
-          name: response.name,
-          companyName: response.companyName,
-          gstNumber: response.gstNumber,
-          contactPerson: response.contactPerson,
-          mobileNumber: response.mobileNumber,
-          bankDetails: response.bankDetails
-        };
-        
-        // First update localStorage to ensure data is persisted
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', response.token);
-        
-        // Then update state
-        setUser(userData);
-        
-        toast.success("Logged in successfully!");
-        return true;
-      } catch (error) {
-        console.error("API login failed, using fallback guest login");
-        
-        // Fallback to guest login when API fails
-        const guestUserData: User = {
-          id: 'guest-user-id',
-          // Use email as name for guest users if provided
-          email: email || 'guest@example.com',
-          name: email?.split('@')[0] || 'Guest User',
-          companyName: 'Guest Company',
-          gstNumber: 'GUEST12345',
-          contactPerson: email?.split('@')[0] || 'Guest User',
-          mobileNumber: '9999999999',
-          bankDetails: {
-            accountName: 'Guest User',
-            accountNumber: '1234567890',
-            ifscCode: 'GUEST001',
-            bankName: 'Guest Bank'
-          }
-        };
-        
-        localStorage.setItem('user', JSON.stringify(guestUserData));
-        localStorage.setItem('token', 'guest-token');
-        setUser(guestUserData);
-        
-        toast.success("Logged in as Guest (API fallback)");
-        return true;
-      }
-    } catch (error: any) {
-      console.error("Login error:", error);
-      const errorMessage = 
-        error.response?.data?.message || 
-        (error.message === 'Network Error' ? 
-          'Cannot connect to server. Please try again later.' : 
-          "Login failed. Please check your credentials and try again.");
-      toast.error(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
 
-  const register = async (
-    name: string, 
-    email: string, 
-    password: string, 
-    companyName: string,
-    gstNumber?: string,
-    contactPerson?: string,
-    mobileNumber?: string
-  ): Promise<boolean> => {
-    try {
-      setIsLoading(true);
-      
-      try {
-        const response = await authService.register({ 
-          name, 
-          email, 
-          password,
-          companyName,
-          gstNumber,
-          contactPerson,
-          mobileNumber
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      if (data) {
+        setUser({
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          companyName: data.company_name,
+          gstNumber: data.gst_number,
+          contactPerson: data.contact_person,
+          mobileNumber: data.mobile_number,
+          bankDetails: data.bank_details
         });
-        
-        if (!response || !response._id) {
-          throw new Error("Invalid response from server");
-        }
-        
-        // Save to state and localStorage
-        const userData: User = {
-          id: response._id,
-          email: response.email,
-          name: response.name,
-          companyName: response.companyName,
-          gstNumber: response.gstNumber,
-          contactPerson: response.contactPerson,
-          mobileNumber: response.mobileNumber,
-          bankDetails: response.bankDetails
-        };
-        
-        // First update localStorage to ensure data is persisted
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', response.token);
-        
-        // Then update state
-        setUser(userData);
-        
-        toast.success("Account created successfully!");
-        return true;
-      } catch (error: any) {
-        console.error("Registration API failed, using fallback guest mode");
-        
-        // Fallback to guest mode when API fails
-        const guestUserData: User = {
-          id: 'guest-user-id',
-          email: email,
-          name: name,
-          companyName: companyName,
-          gstNumber: gstNumber,
-          contactPerson: contactPerson,
-          mobileNumber: mobileNumber
-        };
-        
-        localStorage.setItem('user', JSON.stringify(guestUserData));
-        localStorage.setItem('token', 'guest-token');
-        setUser(guestUserData);
-        
-        toast.success("Account created in Guest mode (server unavailable)");
-        return true;
-      }
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      const errorMessage = 
-        error.response?.data?.message || 
-        (error.message === 'Network Error' ? 
-          'Cannot connect to server. Please try again later.' : 
-          "Registration failed. Please try again.");
-      toast.error(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      } else {
+        // Create profile if it doesn't exist
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authUser.id,
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+            email: authUser.email || '',
+            company_name: ''
+          })
+          .select()
+          .single();
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    toast.info("Logged out successfully");
-    navigate('/login');
-  };
-
-  // Add function to update user profile including bank details
-  const updateUserProfile = (data: Partial<User>) => {
-    if (!user) return;
-    
-    const updatedUser = { ...user, ...data };
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    toast.success("Profile updated successfully");
-  };
-  
-  // Add function to update bank details via API
-  const updateBankDetails = async (bankDetails: BankDetails): Promise<boolean> => {
-    try {
-      setIsLoading(true);
-      
-      // For guest users, just update locally
-      if (user?.id === 'guest-user-id') {
-        const updatedUser = { 
-          ...user, 
-          bankDetails 
-        };
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        toast.success("Bank details updated successfully");
-        return true;
-      }
-      
-      // For logged-in users, update via API
-      try {
-        const response = await authService.updateBankDetails(bankDetails);
-        
-        if (!response) {
-          throw new Error("Failed to update bank details");
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+        } else if (newProfile) {
+          setUser({
+            id: newProfile.id,
+            name: newProfile.name,
+            email: newProfile.email,
+            companyName: newProfile.company_name,
+            gstNumber: newProfile.gst_number,
+            contactPerson: newProfile.contact_person,
+            mobileNumber: newProfile.mobile_number,
+            bankDetails: newProfile.bank_details
+          });
         }
-        
-        const updatedUser = { 
-          ...user as User, 
-          bankDetails: response.bankDetails 
-        };
-        
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        toast.success("Bank details updated successfully");
-        return true;
-      } catch (error) {
-        console.error("API update failed, updating locally", error);
-        
-        // Fallback to local update
-        if (user) {
-          const updatedUser = { 
-            ...user, 
-            bankDetails 
-          };
-          setUser(updatedUser);
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-          toast.success("Bank details updated locally (server unavailable)");
-          return true;
-        }
-        return false;
       }
     } catch (error) {
-      console.error("Update bank details error:", error);
-      toast.error("Failed to update bank details");
-      return false;
-    } finally {
-      setIsLoading(false);
+      console.error('Error in fetchUserProfile:', error);
     }
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Login failed' };
+    }
+  };
+
+  const register = async (data: { name: string; email: string; password: string; companyName?: string; gstNumber?: string; contactPerson?: string; mobileNumber?: string }) => {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name,
+            company_name: data.companyName || ''
+          }
+        }
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Registration failed' };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const updateProfile = async (data: Partial<UserProfile>) => {
+    try {
+      if (!user) return { error: 'Not authenticated' };
+
+      const updateData: any = {};
+      if (data.name) updateData.name = data.name;
+      if (data.companyName !== undefined) updateData.company_name = data.companyName;
+      if (data.gstNumber !== undefined) updateData.gst_number = data.gstNumber;
+      if (data.contactPerson !== undefined) updateData.contact_person = data.contactPerson;
+      if (data.mobileNumber !== undefined) updateData.mobile_number = data.mobileNumber;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      setUser(prev => prev ? { ...prev, ...data } : null);
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Update failed' };
+    }
+  };
+
+  const updateBankDetails = async (bankDetails: BankDetails) => {
+    try {
+      if (!user) return { error: 'Not authenticated' };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bank_details: bankDetails })
+        .eq('id', user.id);
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      setUser(prev => prev ? { ...prev, bankDetails } : null);
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Update failed' };
+    }
+  };
+
+  const loginAsGuest = () => {
+    const guestUser: UserProfile = {
+      id: 'guest-user-id',
+      name: 'Guest User',
+      email: 'guest@example.com',
+      companyName: 'Guest Company'
+    };
+    setUser(guestUser);
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      register, 
-      logout, 
-      isLoading, 
-      updateUserProfile,
-      updateBankDetails
+    <AuthContext.Provider value={{
+      user,
+      session,
+      login,
+      register,
+      logout,
+      updateProfile,
+      updateBankDetails,
+      loading,
+      loginAsGuest
     }}>
       {children}
     </AuthContext.Provider>

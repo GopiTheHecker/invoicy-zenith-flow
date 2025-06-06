@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
-import { invoiceService } from '@/services/invoiceService';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
 export type InvoiceItem = {
@@ -94,108 +94,86 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const { user } = useAuth();
 
-  // Fetch invoices when user changes
   useEffect(() => {
-    if (user) {
+    if (user?.id && user.id !== 'guest-user-id') {
       fetchInvoices();
+    } else if (user?.id === 'guest-user-id') {
+      loadGuestInvoices();
     } else {
-      // If user is logged out, clear invoices
       setInvoices([]);
     }
   }, [user]);
 
   const fetchInvoices = async () => {
-    if (!user) return;
+    if (!user || user.id === 'guest-user-id') return;
     
     try {
-      // For all users, first check localStorage
-      const storedLocalInvoices = localStorage.getItem('localInvoices');
-      let localInvoices: Invoice[] = [];
-      
-      if (storedLocalInvoices) {
-        localInvoices = JSON.parse(storedLocalInvoices);
-      }
-      
-      // For guest users, use only localStorage
-      if (user.id === 'guest-user-id') {
-        const storedGuestInvoices = localStorage.getItem('guestInvoices');
-        if (storedGuestInvoices) {
-          const guestInvoices = JSON.parse(storedGuestInvoices);
-          setInvoices([...guestInvoices, ...localInvoices]);
-        } else {
-          setInvoices(localInvoices);
-        }
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching invoices:', error);
+        toast.error('Failed to fetch invoices');
         return;
       }
-      
-      // For regular users, try to fetch from API
-      try {
-        const data = await invoiceService.getAllInvoices();
-        
-        // Merge remote data with local data (prioritizing remote data)
-        const remoteIds = data.map(invoice => invoice.id);
-        const uniqueLocalInvoices = localInvoices.filter(invoice => !remoteIds.includes(invoice.id));
-        
-        setInvoices([...data, ...uniqueLocalInvoices]);
-        
-        // Sync local invoices to server if there are any
-        if (uniqueLocalInvoices.length > 0) {
-          toast.info(`Syncing ${uniqueLocalInvoices.length} local invoices to server...`);
-          syncLocalInvoicesToServer(uniqueLocalInvoices);
-        }
-      } catch (error) {
-        console.error("API error, using local data:", error);
-        setInvoices(localInvoices);
-        toast.error("Could not connect to server. Using locally stored invoices.");
-      }
-    } catch (error: any) {
-      toast.error("Failed to fetch invoices");
-      console.error(error);
+
+      const formattedInvoices = data.map(transformSupabaseInvoice);
+      setInvoices(formattedInvoices);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to fetch invoices');
     }
   };
 
-  // New function to sync local invoices to server
-  const syncLocalInvoicesToServer = async (localInvoices: Invoice[]) => {
-    if (!user || user.id === 'guest-user-id') return;
-    
-    for (const invoice of localInvoices) {
-      try {
-        // Remove local-specific ID format if present
-        const { id, createdAt, ...invoiceData } = invoice;
-        await invoiceService.createInvoice(invoiceData);
-      } catch (error) {
-        console.error("Failed to sync invoice to server:", error);
-      }
+  const loadGuestInvoices = () => {
+    const storedGuestInvoices = localStorage.getItem('guestInvoices');
+    if (storedGuestInvoices) {
+      const guestInvoices = JSON.parse(storedGuestInvoices);
+      setInvoices(guestInvoices);
     }
-    
-    // Clear local invoices after successful sync
-    localStorage.removeItem('localInvoices');
+  };
+
+  const transformSupabaseInvoice = (data: any): Invoice => {
+    return {
+      id: data.id,
+      invoiceNumber: data.invoice_number,
+      issueDate: data.issue_date,
+      dueDate: data.due_date,
+      paymentTerms: data.payment_terms || '',
+      client: data.client,
+      company: data.company,
+      items: data.items,
+      subtotal: parseFloat(data.subtotal),
+      totalCGST: parseFloat(data.total_cgst),
+      totalSGST: parseFloat(data.total_sgst),
+      totalIGST: parseFloat(data.total_igst),
+      totalGST: parseFloat(data.total_gst),
+      discount: parseFloat(data.discount),
+      total: parseFloat(data.total),
+      roundedTotal: parseFloat(data.rounded_total),
+      amountInWords: data.amount_in_words,
+      notes: data.notes || '',
+      terms: data.terms || '',
+      logo: data.logo,
+      status: data.status,
+      createdAt: data.created_at
+    };
   };
 
   const createInvoice = async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
     try {
-      // Ensure we have valid dates
-      if (typeof invoiceData.issueDate !== 'string' || !invoiceData.issueDate) {
-        invoiceData.issueDate = new Date().toISOString().split('T')[0];
-      }
-      
-      if (typeof invoiceData.dueDate !== 'string' || !invoiceData.dueDate) {
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 30);
-        invoiceData.dueDate = dueDate.toISOString().split('T')[0];
-      }
-      
-      // For guest users or when offline, store in localStorage
-      if (user?.id === 'guest-user-id' || !navigator.onLine) {
-        const storageKey = user?.id === 'guest-user-id' ? 'guestInvoices' : 'localInvoices';
-        const newId = `${storageKey.replace('Invoices', '')}-invoice-${Date.now()}`;
+      // For guest users, store in localStorage
+      if (user?.id === 'guest-user-id') {
+        const newId = `guest-invoice-${Date.now()}`;
         const newInvoice = {
           ...invoiceData,
           id: newId,
           createdAt: new Date().toISOString()
         };
         
-        const storedInvoices = localStorage.getItem(storageKey);
+        const storedInvoices = localStorage.getItem('guestInvoices');
         let updatedInvoices = [newInvoice];
         
         if (storedInvoices) {
@@ -203,65 +181,53 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           updatedInvoices = [...parsedInvoices, newInvoice];
         }
         
-        localStorage.setItem(storageKey, JSON.stringify(updatedInvoices));
-        setInvoices(prev => [...prev, newInvoice]);
+        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
+        setInvoices(prev => [newInvoice, ...prev]);
         
-        toast.success(user?.id === 'guest-user-id' 
-          ? "Invoice created successfully (Guest mode)"
-          : "Invoice saved locally (Offline mode)");
-        
+        toast.success("Invoice created successfully (Guest mode)");
         return newInvoice;
       }
+
+      // For authenticated users, save to Supabase
+      const { data, error } = await supabase
+        .from('invoices')
+        .insert({
+          user_id: user?.id,
+          invoice_number: invoiceData.invoiceNumber,
+          issue_date: invoiceData.issueDate,
+          due_date: invoiceData.dueDate,
+          payment_terms: invoiceData.paymentTerms,
+          client: invoiceData.client,
+          company: invoiceData.company,
+          items: invoiceData.items,
+          subtotal: invoiceData.subtotal,
+          total_cgst: invoiceData.totalCGST,
+          total_sgst: invoiceData.totalSGST,
+          total_igst: invoiceData.totalIGST,
+          total_gst: invoiceData.totalGST,
+          discount: invoiceData.discount,
+          total: invoiceData.total,
+          rounded_total: invoiceData.roundedTotal,
+          amount_in_words: invoiceData.amountInWords,
+          notes: invoiceData.notes,
+          terms: invoiceData.terms,
+          logo: invoiceData.logo,
+          status: invoiceData.status
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating invoice:', error);
+        toast.error('Failed to create invoice');
+        throw error;
+      }
+
+      const newInvoice = transformSupabaseInvoice(data);
+      setInvoices(prev => [newInvoice, ...prev]);
       
-      try {
-        // For regular users, try online mode first
-        const newInvoice = await invoiceService.createInvoice(invoiceData);
-        setInvoices(prev => [...prev, newInvoice]);
-        
-        // Also store in localStorage as backup
-        const localCopy = {
-          ...newInvoice,
-          _synced: true // Mark as already synced with server
-        };
-        
-        const storedInvoices = localStorage.getItem('localInvoices');
-        let updatedLocalInvoices = [localCopy];
-        
-        if (storedInvoices) {
-          const parsedInvoices = JSON.parse(storedInvoices);
-          updatedLocalInvoices = [...parsedInvoices, localCopy];
-        }
-        
-        localStorage.setItem('localInvoices', JSON.stringify(updatedLocalInvoices));
-        
-        toast.success("Invoice created and stored successfully!");
-        return newInvoice;
-      } catch (error: any) {
-        console.error("API error:", error);
-        
-        // Fallback to localStorage if the API fails
-        console.log("API failed, falling back to localStorage");
-        const newId = `local-invoice-${Date.now()}`;
-        const newInvoice = {
-          ...invoiceData,
-          id: newId,
-          createdAt: new Date().toISOString()
-        };
-        
-        const storedInvoices = localStorage.getItem('localInvoices');
-        let updatedInvoices = [newInvoice];
-        
-        if (storedInvoices) {
-          const parsedInvoices = JSON.parse(storedInvoices);
-          updatedInvoices = [...parsedInvoices, newInvoice];
-        }
-        
-        localStorage.setItem('localInvoices', JSON.stringify(updatedInvoices));
-        setInvoices(prev => [...prev, newInvoice]);
-        
-        toast.success("Invoice saved locally due to connection issues");
-        return newInvoice;
-      }
+      toast.success("Invoice created successfully!");
+      return newInvoice;
     } catch (error: any) {
       toast.error("Failed to create invoice");
       console.error(error);
@@ -271,64 +237,60 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateInvoice = async (id: string, invoiceData: Partial<Invoice>) => {
     try {
-      // First, update the invoice in state
-      const updatedInvoices = invoices.map(invoice => 
-        invoice.id === id ? { ...invoice, ...invoiceData } : invoice
-      );
-      
-      setInvoices(updatedInvoices);
-      
-      // For guest users or offline mode, update only in localStorage
-      if (user?.id === 'guest-user-id' || !navigator.onLine) {
-        const storageKey = id.startsWith('guest-') ? 'guestInvoices' : 'localInvoices';
-        localStorage.setItem(storageKey, JSON.stringify(updatedInvoices));
+      // For guest users, update in localStorage
+      if (user?.id === 'guest-user-id' || id.startsWith('guest-')) {
+        const updatedInvoices = invoices.map(invoice => 
+          invoice.id === id ? { ...invoice, ...invoiceData } : invoice
+        );
+        
+        setInvoices(updatedInvoices);
+        localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
         
         toast.success("Invoice updated successfully!");
         return;
       }
+
+      // For authenticated users, update in Supabase
+      const updateData: any = {};
       
-      // For regular users in online mode
-      try {
-        await invoiceService.updateInvoice(id, invoiceData);
-        
-        // Also update in localStorage as backup
-        const allLocalInvoices = localStorage.getItem('localInvoices');
-        if (allLocalInvoices) {
-          const parsedInvoices = JSON.parse(allLocalInvoices);
-          const updatedLocalInvoices = parsedInvoices.map((invoice: Invoice) => 
-            invoice.id === id ? { ...invoice, ...invoiceData, _synced: true } : invoice
-          );
-          localStorage.setItem('localInvoices', JSON.stringify(updatedLocalInvoices));
-        }
-        
-        toast.success("Invoice updated successfully!");
-      } catch (error) {
-        console.error("API update failed, saving locally:", error);
-        
-        // On API failure, ensure the update is saved locally
-        const allLocalInvoices = localStorage.getItem('localInvoices');
-        const updatedInvoice = updatedInvoices.find(inv => inv.id === id);
-        
-        if (updatedInvoice) {
-          let localInvoices = [];
-          if (allLocalInvoices) {
-            localInvoices = JSON.parse(allLocalInvoices);
-            // Check if invoice exists in local storage
-            const localIndex = localInvoices.findIndex((inv: Invoice) => inv.id === id);
-            if (localIndex >= 0) {
-              localInvoices[localIndex] = { ...updatedInvoice, _synced: false };
-            } else {
-              localInvoices.push({ ...updatedInvoice, _synced: false });
-            }
-          } else {
-            localInvoices = [{ ...updatedInvoice, _synced: false }];
-          }
-          
-          localStorage.setItem('localInvoices', JSON.stringify(localInvoices));
-        }
-        
-        toast.info("Invoice saved locally due to connection issues");
+      if (invoiceData.invoiceNumber) updateData.invoice_number = invoiceData.invoiceNumber;
+      if (invoiceData.issueDate) updateData.issue_date = invoiceData.issueDate;
+      if (invoiceData.dueDate) updateData.due_date = invoiceData.dueDate;
+      if (invoiceData.paymentTerms) updateData.payment_terms = invoiceData.paymentTerms;
+      if (invoiceData.client) updateData.client = invoiceData.client;
+      if (invoiceData.company) updateData.company = invoiceData.company;
+      if (invoiceData.items) updateData.items = invoiceData.items;
+      if (invoiceData.subtotal !== undefined) updateData.subtotal = invoiceData.subtotal;
+      if (invoiceData.totalCGST !== undefined) updateData.total_cgst = invoiceData.totalCGST;
+      if (invoiceData.totalSGST !== undefined) updateData.total_sgst = invoiceData.totalSGST;
+      if (invoiceData.totalIGST !== undefined) updateData.total_igst = invoiceData.totalIGST;
+      if (invoiceData.totalGST !== undefined) updateData.total_gst = invoiceData.totalGST;
+      if (invoiceData.discount !== undefined) updateData.discount = invoiceData.discount;
+      if (invoiceData.total !== undefined) updateData.total = invoiceData.total;
+      if (invoiceData.roundedTotal !== undefined) updateData.rounded_total = invoiceData.roundedTotal;
+      if (invoiceData.amountInWords) updateData.amount_in_words = invoiceData.amountInWords;
+      if (invoiceData.notes !== undefined) updateData.notes = invoiceData.notes;
+      if (invoiceData.terms !== undefined) updateData.terms = invoiceData.terms;
+      if (invoiceData.logo !== undefined) updateData.logo = invoiceData.logo;
+      if (invoiceData.status) updateData.status = invoiceData.status;
+
+      const { error } = await supabase
+        .from('invoices')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating invoice:', error);
+        toast.error('Failed to update invoice');
+        throw error;
       }
+
+      // Update local state
+      setInvoices(prev => prev.map(invoice => 
+        invoice.id === id ? { ...invoice, ...invoiceData } : invoice
+      ));
+      
+      toast.success("Invoice updated successfully!");
     } catch (error: any) {
       toast.error("Failed to update invoice");
       console.error(error);
@@ -336,16 +298,14 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Add delete invoice functionality
   const deleteInvoice = async (id: string) => {
     try {
       // For guest users, delete from localStorage
-      if (user?.id === 'guest-user-id') {
+      if (user?.id === 'guest-user-id' || id.startsWith('guest-')) {
         const updatedInvoices = invoices.filter(invoice => invoice.id !== id);
         setInvoices(updatedInvoices);
         localStorage.setItem('guestInvoices', JSON.stringify(updatedInvoices));
         
-        // If the deleted invoice is the current one, clear it
         if (currentInvoice?.id === id) {
           setCurrentInvoice(null);
         }
@@ -353,14 +313,21 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         toast.success("Invoice deleted successfully!");
         return true;
       }
-      
-      // For regular users
-      await invoiceService.deleteInvoice(id);
-      
-      // Update state to remove the deleted invoice
+
+      // For authenticated users, delete from Supabase
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting invoice:', error);
+        toast.error('Failed to delete invoice');
+        return false;
+      }
+
       setInvoices(prev => prev.filter(invoice => invoice.id !== id));
       
-      // If the deleted invoice is the current one, clear it
       if (currentInvoice?.id === id) {
         setCurrentInvoice(null);
       }
@@ -382,23 +349,31 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (localInvoice) {
         return localInvoice;
       }
-      
+
       // For guest users, we've already checked localStorage via the invoices state
-      if (user?.id === 'guest-user-id') {
+      if (user?.id === 'guest-user-id' || id.startsWith('guest-')) {
         return undefined;
       }
-      
-      // If not in state, fetch from API
-      const fetchedInvoice = await invoiceService.getInvoiceById(id);
-      return fetchedInvoice;
+
+      // If not in state, fetch from Supabase
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching invoice:', error);
+        return undefined;
+      }
+
+      return transformSupabaseInvoice(data);
     } catch (error) {
-      toast.error("Failed to get invoice");
-      console.error(error);
+      console.error('Error:', error);
       return undefined;
     }
   };
 
-  // Function to get the user's bank details
   const getUserBankDetails = () => {
     if (!user || !user.bankDetails) {
       return {
@@ -413,7 +388,6 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const generateInvoiceNumber = () => {
-    // Format: SIT-XXX-24-25 (Incremental number for each new bill)
     const currentYear = new Date().getFullYear();
     const yearPart = `${(currentYear % 100)}-${(currentYear % 100) + 1}`;
     
@@ -437,7 +411,6 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return `${prefix}-${String(sequenceNumber).padStart(3, '0')}-${yearPart}`;
   };
 
-  // Function to convert number to words for Indian Rupees
   const numberToWords = (num: number) => {
     const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -494,7 +467,6 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return result + ' Only';
   };
 
-  // Update the formatDate function used in InvoicePreview to be more robust
   const formatDate = (dateString: string): string => {
     try {
       // Skip processing if null or undefined

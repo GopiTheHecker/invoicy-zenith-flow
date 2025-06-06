@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Upload, Calendar } from "lucide-react";
+import { Calendar, ArrowLeft } from "lucide-react";
 import { Invoice, InvoiceItem } from '@/contexts/InvoiceContext';
+import InvoiceItemRow from '@/components/invoice/InvoiceItem';
 import {
   Select,
   SelectContent,
@@ -49,18 +50,11 @@ const InvoiceGenerator = () => {
     gstRate: 0,
     discountPercent: 0
   }]);
-  const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [logo, setLogo] = useState<string | undefined>(undefined);
   const [logoPreview, setLogoPreview] = useState<string | undefined>(undefined);
-  const [showBankDetails, setShowBankDetails] = useState(false);
-  const [bankDetails, setBankDetails] = useState({
-    accountName: '',
-    accountNumber: '',
-    ifscCode: '',
-    bankName: ''
-  });
+
   const { user } = useAuth();
   const { createInvoice, updateInvoice, getInvoice, generateInvoiceNumber, calculateInvoiceValues, setCurrentInvoice } = useInvoices();
   const navigate = useNavigate();
@@ -68,36 +62,24 @@ const InvoiceGenerator = () => {
 
   // Set default dates when component loads
   useEffect(() => {
-    // Set today as the default issue date
     const today = new Date();
     const formattedToday = today.toISOString().split('T')[0];
     setIssueDate(formattedToday);
     
-    // Set due date as 30 days from today
     const dueDate = new Date();
     dueDate.setDate(today.getDate() + 30);
     const formattedDueDate = dueDate.toISOString().split('T')[0];
     setDueDate(formattedDueDate);
     
-    // Set default payment terms
     setPaymentTerms('Net 30 days');
   }, []);
 
-  // Set invoice number and fill bank details from user profile
+  // Set invoice number when user loads
   useEffect(() => {
-    if (user) {
+    if (user && !id) {
       setInvoiceNumber(generateInvoiceNumber());
-      
-      if (user.bankDetails) {
-        setBankDetails({
-          accountName: user.bankDetails.accountName || '',
-          accountNumber: user.bankDetails.accountNumber || '',
-          ifscCode: user.bankDetails.ifscCode || '',
-          bankName: user.bankDetails.bankName || ''
-        });
-      }
     }
-  }, [user, generateInvoiceNumber]);
+  }, [user, generateInvoiceNumber, id]);
 
   // Fetch invoice if editing
   useEffect(() => {
@@ -117,17 +99,18 @@ const InvoiceGenerator = () => {
         setClient(invoice.client);
         setCompany(invoice.company);
         setItems(invoice.items);
-        setDiscount(invoice.discount);
         setNotes(invoice.notes);
         setTerms(invoice.terms);
         setLogo(invoice.logo);
         setLogoPreview(invoice.logo);
       } else {
         toast.error("Error: Invoice not found");
+        navigate('/dashboard');
       }
     } catch (error) {
       console.error('Error fetching invoice:', error);
       toast.error("Error: Failed to fetch invoice");
+      navigate('/dashboard');
     }
   };
 
@@ -154,10 +137,6 @@ const InvoiceGenerator = () => {
     setLogoPreview(undefined);
   };
 
-  const toggleBankDetails = () => {
-    setShowBankDetails(!showBankDetails);
-  };
-
   const handleAddItem = () => {
     setItems(prevItems => [...prevItems, {
       id: String(Date.now()),
@@ -175,10 +154,10 @@ const InvoiceGenerator = () => {
     setItems(prevItems => prevItems.filter(item => item.id !== id));
   };
 
-  const handleItemChange = (id: string, field: string, value: any) => {
+  const handleItemChange = (id: string, updates: Partial<InvoiceItem>) => {
     setItems(prevItems =>
       prevItems.map(item =>
-        item.id === id ? { ...item, [field]: value } : item
+        item.id === id ? { ...item, ...updates } : item
       )
     );
   };
@@ -191,41 +170,14 @@ const InvoiceGenerator = () => {
     setCompany(prevCompany => ({ ...prevCompany, [field]: value }));
   };
 
-  const handleBankDetailsChange = (field: string, value: string) => {
-    setBankDetails(prev => ({ ...prev, [field]: value }));
-  };
-
-  const calculateItemAmount = useCallback((item: InvoiceItem): number => {
-    return item.quantity * item.rate;
-  }, []);
-
-  useEffect(() => {
-    const updatedItems = items.map(item => ({
-      ...item,
-      amount: calculateItemAmount(item)
-    }));
-    
-    // Only update if the calculated amount is different
-    const hasChanged = updatedItems.some((item, index) => item.amount !== items[index].amount);
-    if (hasChanged) {
-      setItems(updatedItems);
-    }
-  }, [items, calculateItemAmount]);
-
-  const handleDiscountChange = (value: number) => {
-    setDiscount(value);
-  };
-
   const handleSave = async (status: 'draft' | 'sent' | 'paid' = 'draft') => {
     try {
-      // Validate dates to ensure they are valid
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(issueDate) || !dateRegex.test(dueDate)) {
         toast.error("Error: Please enter valid dates in YYYY-MM-DD format");
         return;
       }
 
-      // Make sure all required fields are filled
       if (!client.name || !client.email || !client.address || !client.state) {
         toast.error("Error: Please fill in all required client information");
         return;
@@ -236,13 +188,11 @@ const InvoiceGenerator = () => {
         return;
       }
 
-      // Check if there are any items
       if (items.length === 0) {
         toast.error("Error: Please add at least one item to the invoice");
         return;
       }
 
-      // Validate each item
       for (const item of items) {
         if (!item.description || item.quantity <= 0) {
           toast.error("Error: All items must have a description and quantity greater than zero");
@@ -250,7 +200,6 @@ const InvoiceGenerator = () => {
         }
       }
 
-      // Calculate values based on invoice items
       const {
         subtotal,
         totalCGST,
@@ -260,7 +209,7 @@ const InvoiceGenerator = () => {
         total,
         roundedTotal,
         amountInWords
-      } = calculateInvoiceValues(items, discount, company.state === client.state);
+      } = calculateInvoiceValues(items, 0, company.state === client.state);
 
       const invoiceData = {
         invoiceNumber,
@@ -275,7 +224,7 @@ const InvoiceGenerator = () => {
         totalSGST,
         totalIGST,
         totalGST,
-        discount,
+        discount: 0,
         total,
         roundedTotal,
         amountInWords,
@@ -285,12 +234,15 @@ const InvoiceGenerator = () => {
         status
       };
 
-      const newInvoice = await createInvoice(invoiceData);
+      let newInvoice;
+      if (id) {
+        await updateInvoice(id, invoiceData);
+        newInvoice = { ...invoiceData, id, createdAt: new Date().toISOString() };
+      } else {
+        newInvoice = await createInvoice(invoiceData);
+      }
       
-      // Now set the current invoice with the returned invoice data
       setCurrentInvoice(newInvoice);
-      
-      // Navigate to preview
       navigate(`/invoice/preview/${newInvoice.id}`);
       toast.success("Invoice saved successfully");
     } catch (error) {
@@ -310,23 +262,44 @@ const InvoiceGenerator = () => {
   ];
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Invoice Generator</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => handleSave('draft')} variant="outline">Save as Draft</Button>
-          <Button onClick={() => handleSave('sent')} variant="outline">Save & Send</Button>
-          <Button onClick={() => handleSave('paid')}>Save as Paid</Button>
+    <div className="container mx-auto p-2 md:p-4 max-w-7xl">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6 gap-4">
+        <div className="flex items-center">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/dashboard')}
+            className="mr-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <h1 className="text-xl md:text-2xl font-bold">
+            {id ? 'Edit Invoice' : 'Create Invoice'}
+          </h1>
+        </div>
+        <div className="flex flex-col md:flex-row gap-2">
+          <Button onClick={() => handleSave('draft')} variant="outline" className="w-full md:w-auto">
+            Save as Draft
+          </Button>
+          <Button onClick={() => handleSave('sent')} variant="outline" className="w-full md:w-auto">
+            Save & Send
+          </Button>
+          <Button onClick={() => handleSave('paid')} className="w-full md:w-auto">
+            Save as Paid
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Company & Invoice Info Section */}
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        {/* Company Info */}
+        <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Company & Invoice Info</CardTitle>
+            <CardTitle className="text-lg">Company Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Logo Upload */}
             <div>
               <Label htmlFor="company-logo">Company Logo</Label>
               <div className="mt-2 border-2 border-dashed rounded-md p-4 text-center">
@@ -336,7 +309,7 @@ const InvoiceGenerator = () => {
                     <Button 
                       variant="destructive" 
                       size="sm" 
-                      className="absolute top-0 right-0 h-6 w-6 p-0" 
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0" 
                       onClick={removeLogo}
                     >
                       ×
@@ -346,9 +319,9 @@ const InvoiceGenerator = () => {
                   <div className="flex flex-col items-center">
                     <Label 
                       htmlFor="logo-upload" 
-                      className="cursor-pointer text-gray-500 hover:text-gray-700"
+                      className="cursor-pointer text-gray-500 hover:text-gray-700 text-sm"
                     >
-                      Upload your company logo
+                      Upload logo
                     </Label>
                     <Input 
                       type="file" 
@@ -371,7 +344,7 @@ const InvoiceGenerator = () => {
             </div>
 
             <div>
-              <Label htmlFor="company-name">Company Name</Label>
+              <Label htmlFor="company-name">Company Name *</Label>
               <Input 
                 id="company-name" 
                 placeholder="Your company name" 
@@ -381,7 +354,7 @@ const InvoiceGenerator = () => {
             </div>
 
             <div>
-              <Label htmlFor="company-gstin">Company GSTIN</Label>
+              <Label htmlFor="company-gstin">Company GSTIN *</Label>
               <Input 
                 id="company-gstin" 
                 placeholder="e.g. 22AAAAA0000A1Z5" 
@@ -391,7 +364,7 @@ const InvoiceGenerator = () => {
             </div>
 
             <div>
-              <Label htmlFor="company-state">Company State</Label>
+              <Label htmlFor="company-state">Company State *</Label>
               <Select 
                 value={company.state} 
                 onValueChange={(value) => handleCompanyChange('state', value)}
@@ -408,17 +381,18 @@ const InvoiceGenerator = () => {
             </div>
 
             <div>
-              <Label htmlFor="company-address">Company Address</Label>
+              <Label htmlFor="company-address">Company Address *</Label>
               <Textarea 
                 id="company-address" 
                 placeholder="Full address" 
                 value={company.address} 
                 onChange={(e) => handleCompanyChange('address', e.target.value)} 
+                className="min-h-20"
               />
             </div>
 
             <div>
-              <Label htmlFor="company-signatory">Authorized Signatory</Label>
+              <Label htmlFor="company-signatory">Authorized Signatory *</Label>
               <Input 
                 id="company-signatory" 
                 placeholder="Name of authorized person" 
@@ -429,15 +403,15 @@ const InvoiceGenerator = () => {
           </CardContent>
         </Card>
 
-        {/* Invoice Details Section */}
-        <Card>
+        {/* Invoice Details */}
+        <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Invoice Details</CardTitle>
+            <CardTitle className="text-lg">Invoice Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="invoiceNumber">Invoice Number</Label>
-              <Input type="text" id="invoiceNumber" value={invoiceNumber} readOnly />
+              <Input type="text" id="invoiceNumber" value={invoiceNumber} readOnly className="bg-gray-50" />
             </div>
             
             <div>
@@ -484,6 +458,7 @@ const InvoiceGenerator = () => {
                 placeholder="Additional notes for the client" 
                 value={notes} 
                 onChange={(e) => setNotes(e.target.value)} 
+                className="min-h-20"
               />
             </div>
             
@@ -494,20 +469,20 @@ const InvoiceGenerator = () => {
                 placeholder="1. Payment due within 30 days of issue.&#10;2. Goods once sold will not be taken back." 
                 value={terms} 
                 onChange={(e) => setTerms(e.target.value)} 
-                className="min-h-[150px]"
+                className="min-h-32"
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Client Details Section */}
-        <Card>
+        {/* Client Details */}
+        <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Client Details</CardTitle>
+            <CardTitle className="text-lg">Client Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="clientName">Client Name</Label>
+              <Label htmlFor="clientName">Client Name *</Label>
               <Input 
                 type="text" 
                 id="clientName" 
@@ -518,7 +493,7 @@ const InvoiceGenerator = () => {
             </div>
             
             <div>
-              <Label htmlFor="clientEmail">Client Email</Label>
+              <Label htmlFor="clientEmail">Client Email *</Label>
               <Input 
                 type="email" 
                 id="clientEmail" 
@@ -551,7 +526,7 @@ const InvoiceGenerator = () => {
             </div>
             
             <div>
-              <Label htmlFor="clientState">Client State</Label>
+              <Label htmlFor="clientState">Client State *</Label>
               <Select 
                 value={client.state} 
                 onValueChange={(value) => handleClientChange('state', value)}
@@ -568,183 +543,55 @@ const InvoiceGenerator = () => {
             </div>
             
             <div>
-              <Label htmlFor="clientAddress">Client Address</Label>
+              <Label htmlFor="clientAddress">Client Address *</Label>
               <Textarea 
                 id="clientAddress" 
                 placeholder="Full address" 
                 value={client.address} 
                 onChange={(e) => handleClientChange('address', e.target.value)} 
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="discount">Discount (%)</Label>
-              <Input
-                type="number"
-                id="discount"
-                placeholder="0"
-                value={discount}
-                onChange={(e) => handleDiscountChange(Number(e.target.value))}
+                className="min-h-20"
               />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Bank Details Section */}
-      <Card className="mt-6">
+      {/* Invoice Items */}
+      <Card className="mt-4 md:mt-6">
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Bank Details</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={toggleBankDetails}>
-              {showBankDetails ? "Use Profile Bank Details" : "Add Custom Bank Details"}
+          <CardTitle className="text-lg">Invoice Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="hidden md:block">
+              <div className="grid grid-cols-10 gap-3 text-sm font-medium text-gray-600 pb-2 border-b">
+                <div className="col-span-1">HSN/SAC</div>
+                <div className="col-span-3">Description</div>
+                <div className="col-span-1">Qty</div>
+                <div className="col-span-1">Rate (₹)</div>
+                <div className="col-span-1">Disc %</div>
+                <div className="col-span-1">GST %</div>
+                <div className="col-span-1">Amount (₹)</div>
+                <div className="col-span-1">Action</div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {items.map((item) => (
+                <InvoiceItemRow
+                  key={item.id}
+                  item={item}
+                  onChange={handleItemChange}
+                  onRemove={handleRemoveItem}
+                  canRemove={items.length > 1}
+                />
+              ))}
+            </div>
+            
+            <Button type="button" onClick={handleAddItem} variant="outline" className="w-full md:w-auto">
+              Add Item
             </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          {showBankDetails ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="accountName">Account Name</Label>
-                <Input 
-                  type="text" 
-                  id="accountName" 
-                  value={bankDetails.accountName} 
-                  onChange={(e) => handleBankDetailsChange('accountName', e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label htmlFor="accountNumber">Account Number</Label>
-                <Input 
-                  type="text" 
-                  id="accountNumber" 
-                  value={bankDetails.accountNumber} 
-                  onChange={(e) => handleBankDetailsChange('accountNumber', e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label htmlFor="ifscCode">IFSC Code</Label>
-                <Input 
-                  type="text" 
-                  id="ifscCode" 
-                  value={bankDetails.ifscCode} 
-                  onChange={(e) => handleBankDetailsChange('ifscCode', e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label htmlFor="bankName">Bank Name</Label>
-                <Input 
-                  type="text" 
-                  id="bankName" 
-                  value={bankDetails.bankName} 
-                  onChange={(e) => handleBankDetailsChange('bankName', e.target.value)} 
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gray-50 p-4 rounded">
-              <p className="text-sm">Using bank details from your profile. You can update them in your profile or add custom details for this invoice.</p>
-              {user?.bankDetails ? (
-                <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                  <div><span className="font-medium">Account Name:</span> {user.bankDetails.accountName}</div>
-                  <div><span className="font-medium">Account Number:</span> {user.bankDetails.accountNumber}</div>
-                  <div><span className="font-medium">IFSC Code:</span> {user.bankDetails.ifscCode}</div>
-                  <div><span className="font-medium">Bank Name:</span> {user.bankDetails.bankName}</div>
-                </div>
-              ) : (
-                <p className="text-amber-500 text-sm mt-1">No bank details found in your profile. Please add them in your profile or add custom details for this invoice.</p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Invoice Items Section */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Invoice Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Description</th>
-                  <th className="text-left p-2">HSN Code</th>
-                  <th className="text-left p-2">Quantity</th>
-                  <th className="text-left p-2">Rate (₹)</th>
-                  <th className="text-left p-2">GST %</th>
-                  <th className="text-left p-2">Amount (₹)</th>
-                  <th className="text-left p-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b">
-                    <td className="p-2">
-                      <Input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
-                        placeholder="Item description"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="text"
-                        value={item.hsnCode}
-                        onChange={(e) => handleItemChange(item.id, 'hsnCode', e.target.value)}
-                        placeholder="HSN Code"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(item.id, 'quantity', Number(e.target.value))}
-                        className="w-20"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={item.rate}
-                        onChange={(e) => handleItemChange(item.id, 'rate', Number(e.target.value))}
-                        className="w-24"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={item.gstRate}
-                        onChange={(e) => handleItemChange(item.id, 'gstRate', Number(e.target.value))}
-                        className="w-20"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        value={item.amount}
-                        readOnly
-                        className="w-24 bg-gray-50"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleRemoveItem(item.id)}
-                        disabled={items.length <= 1}
-                      >
-                        Remove
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Button type="button" onClick={handleAddItem} className="mt-4">Add Item</Button>
         </CardContent>
       </Card>
     </div>

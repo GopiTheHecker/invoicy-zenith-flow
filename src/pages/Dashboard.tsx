@@ -86,22 +86,23 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-2 md:p-4 space-y-4 md:space-y-6">
+      {/* Header Section */}
       <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+        <div className="text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Welcome, {user?.name}
           </h1>
-          <p className="text-gray-500">
+          <p className="text-gray-500 text-sm md:text-base">
             Manage your invoices and create new ones
           </p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
           <Sheet>
             <SheetTrigger asChild>
               <Button 
                 variant="outline" 
-                className="flex md:hidden"
+                className="flex md:hidden w-full"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
@@ -114,7 +115,7 @@ const Dashboard = () => {
           
           <Button 
             onClick={() => navigate("/invoice/new")}
-            className="bg-primary hover:bg-primary-300"
+            className="bg-primary hover:bg-primary-300 w-full md:w-auto"
           >
             <FilePlus className="mr-2 h-4 w-4" />
             Create New Invoice
@@ -122,40 +123,45 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6">
-        <div className="hidden md:block w-full md:w-64">
+      <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
+        {/* Desktop Filter Panel */}
+        <div className="hidden lg:block w-full lg:w-64">
           <FilterPanel onFilterChange={handleFilterChange} />
         </div>
         
+        {/* Main Content */}
         <div className="flex-1">
-          <div className="mb-6">
+          {/* Search Bar */}
+          <div className="mb-4 md:mb-6">
             <SearchBar onSearch={handleSearch} placeholder="Search invoices, clients, amounts..." />
           </div>
           
-          <div className="mb-4 flex justify-between items-center">
-            <h2 className="text-xl font-semibold">
+          {/* View Mode Toggle and Count */}
+          <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <h2 className="text-lg md:text-xl font-semibold">
               Your Invoices {filteredInvoices.length > 0 && `(${filteredInvoices.length})`}
             </h2>
             <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'cards' | 'table')}>
-              <TabsList>
-                <TabsTrigger value="cards">Cards</TabsTrigger>
-                <TabsTrigger value="table">Table</TabsTrigger>
+              <TabsList className="w-full md:w-auto">
+                <TabsTrigger value="cards" className="flex-1 md:flex-none">Cards</TabsTrigger>
+                <TabsTrigger value="table" className="flex-1 md:flex-none">Table</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
           
+          {/* Content */}
           {invoices.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
-              <div className="flex justify-center">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-12 text-center">
+              <div className="flex justify-center mb-4">
                 <FileText className="h-12 w-12 text-gray-400" />
               </div>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">No Invoices Yet</h3>
-              <p className="mt-2 text-gray-500">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Invoices Yet</h3>
+              <p className="text-gray-500 mb-6">
                 Create your first invoice to get started
               </p>
               <Button
                 onClick={() => navigate("/invoice/new")}
-                className="mt-6 bg-primary hover:bg-primary-300"
+                className="bg-primary hover:bg-primary-300"
               >
                 <FilePlus className="mr-2 h-4 w-4" />
                 Create New Invoice
@@ -164,19 +170,19 @@ const Dashboard = () => {
           ) : (
             <>
               {filteredInvoices.length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center">
-                  <div className="flex justify-center">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 md:p-8 text-center">
+                  <div className="flex justify-center mb-4">
                     <FileText className="h-8 w-8 text-gray-400" />
                   </div>
-                  <h3 className="mt-4 font-medium text-gray-900">No Matching Invoices</h3>
-                  <p className="mt-2 text-sm text-gray-500">
+                  <h3 className="font-medium text-gray-900 mb-2">No Matching Invoices</h3>
+                  <p className="text-sm text-gray-500">
                     Try adjusting your search or filters
                   </p>
                 </div>
               ) : (
                 <Tabs value={viewMode} className="w-full">
                   <TabsContent value="cards" className="mt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {filteredInvoices.map((invoice) => (
                         <InvoiceCard key={invoice.id} invoice={invoice} />
                       ))}
@@ -184,14 +190,14 @@ const Dashboard = () => {
                   </TabsContent>
                   
                   <TabsContent value="table" className="mt-0">
-                    <InvoiceTable invoices={filteredInvoices} />
+                    <div className="overflow-hidden rounded-lg border">
+                      <InvoiceTable invoices={filteredInvoices} />
+                    </div>
                   </TabsContent>
                 </Tabs>
               )}
             </>
           )}
-          
-        
         </div>
       </div>
     </div>
