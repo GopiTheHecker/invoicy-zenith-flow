@@ -77,6 +77,7 @@ type InvoiceContextType = {
     ifscCode: string;
     bankName: string;
   } | undefined;
+  isLoading: boolean;
 };
 
 const InvoiceContext = createContext<InvoiceContextType | undefined>(undefined);
@@ -92,6 +93,7 @@ export const useInvoices = () => {
 export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
   console.log('InvoiceProvider rendered, user:', user);
@@ -110,23 +112,29 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const fetchInvoices = async () => {
     if (!user || user.id === 'guest-user-id') return;
     
+    setIsLoading(true);
     try {
+      console.log('Fetching invoices for user:', user.id);
       const { data, error } = await supabase
         .from('invoices')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching invoices:', error);
-        toast.error('Failed to fetch invoices');
+        toast.error('Failed to fetch invoices: ' + error.message);
         return;
       }
 
+      console.log('Fetched invoices:', data);
       const formattedInvoices = data.map(transformSupabaseInvoice);
       setInvoices(formattedInvoices);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to fetch invoices');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -291,11 +299,12 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const { error } = await supabase
         .from('invoices')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Error updating invoice:', error);
-        toast.error('Failed to update invoice');
+        toast.error('Failed to update invoice: ' + error.message);
         throw error;
       }
 
@@ -332,11 +341,12 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const { error } = await supabase
         .from('invoices')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user?.id);
 
       if (error) {
         console.error('Error deleting invoice:', error);
-        toast.error('Failed to delete invoice');
+        toast.error('Failed to delete invoice: ' + error.message);
         return false;
       }
 
@@ -374,6 +384,7 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .from('invoices')
         .select('*')
         .eq('id', id)
+        .eq('user_id', user?.id)
         .single();
 
       if (error) {
@@ -565,7 +576,8 @@ export const InvoiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       getInvoice,
       generateInvoiceNumber,
       calculateInvoiceValues,
-      getUserBankDetails
+      getUserBankDetails,
+      isLoading
     }}>
       {children}
     </InvoiceContext.Provider>

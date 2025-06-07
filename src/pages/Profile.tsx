@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from '@/contexts/AuthContext';
 
 const Profile = () => {
-  const { user, updateProfile, updateBankDetails, logout } = useAuth();
+  const { user, updateBankDetails, logout } = useAuth();
   
   const [accountName, setAccountName] = useState(user?.bankDetails?.accountName || '');
   const [accountNumber, setAccountNumber] = useState(user?.bankDetails?.accountNumber || '');
