@@ -3,11 +3,11 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { useInvoice } from '@/contexts/InvoiceContext';
+import { useInvoices } from '@/contexts/InvoiceContext';
 import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
 
 const Reports = () => {
-  const { invoices } = useInvoice();
+  const { invoices } = useInvoices();
 
   // Generate monthly revenue data for the last 6 months
   const monthlyData = React.useMemo(() => {
@@ -21,7 +21,7 @@ const Reports = () => {
       const monthEnd = endOfMonth(month);
       
       const monthlyInvoices = invoices.filter(invoice => {
-        const invoiceDate = new Date(invoice.issue_date);
+        const invoiceDate = new Date(invoice.issueDate);
         return invoiceDate >= monthStart && invoiceDate <= monthEnd;
       });
 
@@ -163,7 +163,19 @@ const Reports = () => {
                     <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                   ))}
                 </Pie>
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white p-2 border rounded shadow">
+                          <p>{`${data.status}: ${data.count}`}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
               </PieChart>
             </ChartContainer>
             <div className="mt-4 grid grid-cols-2 gap-2">
