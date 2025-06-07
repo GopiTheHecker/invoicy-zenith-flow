@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, LogOut, UserIcon, PlusSquare, BarChart2, Settings, Menu } from "lucide-react";
+import { FileText, LogOut, UserIcon, PlusSquare, BarChart3, Settings, Menu } from "lucide-react";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -24,15 +24,17 @@ const Navbar = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          <Link to="/dashboard" className="flex items-center space-x-2">
+        <div className="flex h-16 items-center">
+          {/* Logo - Left */}
+          <Link to="/dashboard" className="flex items-center space-x-2 mr-6">
             <FileText className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold text-gray-900">InvoiceGen</span>
+            <span className="text-xl font-bold text-foreground">InvoiceGen</span>
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-1">
+          {/* Navigation Items - Left side */}
+          <nav className="hidden md:flex items-center space-x-1 flex-1">
             <Button
               variant={isActive('/dashboard') ? 'default' : 'ghost'}
               size="sm"
@@ -61,7 +63,7 @@ const Navbar = () => {
               asChild
             >
               <Link to="/reports" className="flex items-center space-x-2">
-                <BarChart2 className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4" />
                 <span>Reports</span>
               </Link>
             </Button>
@@ -78,12 +80,15 @@ const Navbar = () => {
             </Button>
           </nav>
 
-          <div className="flex items-center space-x-2">
+          {/* Profile Dropdown - Right side */}
+          <div className="ml-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="flex items-center space-x-2">
                   <UserIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline-block">{user?.name || 'User'}</span>
+                  <span className="hidden sm:inline-block max-w-32 truncate">
+                    {user?.name || 'User'}
+                  </span>
                   <Menu className="h-4 w-4 md:hidden" />
                 </Button>
               </DropdownMenuTrigger>
@@ -91,27 +96,30 @@ const Navbar = () => {
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 
-                <DropdownMenuItem className="md:hidden" onClick={() => navigate("/dashboard")}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Dashboard
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem className="md:hidden" onClick={() => navigate("/invoice/new")}>
-                  <PlusSquare className="h-4 w-4 mr-2" />
-                  Create Invoice
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem className="md:hidden" onClick={() => navigate("/reports")}>
-                  <BarChart2 className="h-4 w-4 mr-2" />
-                  Reports
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem className="md:hidden" onClick={() => navigate("/settings")}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator className="md:hidden" />
+                {/* Mobile navigation items */}
+                <div className="md:hidden">
+                  <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem onClick={() => navigate("/invoice/new")}>
+                    <PlusSquare className="h-4 w-4 mr-2" />
+                    Create Invoice
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem onClick={() => navigate("/reports")}>
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Reports
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                </div>
                 
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
                   <UserIcon className="h-4 w-4 mr-2" />

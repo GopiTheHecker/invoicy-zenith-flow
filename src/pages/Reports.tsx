@@ -54,7 +54,7 @@ const Reports = () => {
   const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
   const totalInvoices = invoices.length;
   const avgInvoiceValue = totalInvoices > 0 ? totalRevenue / totalInvoices : 0;
-  const pendingInvoices = invoices.filter(invoice => invoice.status === 'pending').length;
+  const draftInvoices = invoices.filter(invoice => invoice.status === 'draft').length;
 
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe'];
 
@@ -106,10 +106,10 @@ const Reports = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
+            <CardTitle className="text-sm font-medium">Draft Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingInvoices}</div>
+            <div className="text-2xl font-bold">{draftInvoices}</div>
           </CardContent>
         </Card>
       </div>
