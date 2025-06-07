@@ -13,6 +13,8 @@ import Dashboard from "./pages/Dashboard";
 import InvoiceGenerator from "./pages/InvoiceGenerator";
 import InvoicePreview from "./pages/InvoicePreview";
 import Profile from "./pages/Profile";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +67,22 @@ const App = () => (
                   element={
                     <RequireAuth>
                       <Profile />
+                    </RequireAuth>
+                  } 
+                />
+                <Route 
+                  path="reports" 
+                  element={
+                    <RequireAuth>
+                      <Reports />
+                    </RequireAuth>
+                  } 
+                />
+                <Route 
+                  path="settings" 
+                  element={
+                    <RequireAuth>
+                      <Settings />
                     </RequireAuth>
                   } 
                 />

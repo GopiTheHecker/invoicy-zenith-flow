@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
@@ -56,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       async (event, session) => {
         console.log('Auth state change:', event, session);
         setSession(session);
+        setLoading(true);
         
         if (session?.user) {
           await fetchUserProfile(session.user);
@@ -68,15 +68,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      setSession(session);
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('Initial session check:', session, error);
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        setSession(session);
+        if (session?.user) {
+          await fetchUserProfile(session.user);
+        }
+      } catch (error) {
+        console.error('Error in auth initialization:', error);
+      } finally {
         setLoading(false);
       }
-    });
+    };
+
+    initializeAuth();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -141,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('Attempting login for:', email);
+      setLoading(true);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -157,11 +172,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           toast.error(error.message);
         }
+        setLoading(false);
         return false;
       }
 
       if (data.user && !data.user.email_confirmed_at) {
         toast.error('Please confirm your email address before logging in.');
+        setLoading(false);
         return false;
       }
 
@@ -170,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Login failed');
+      setLoading(false);
       return false;
     }
   };
@@ -221,12 +239,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-      toast.success('Logged out successfully');
+      console.log('Logging out user...');
+      setLoading(true);
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Logout error:', error);
+        toast.error('Error signing out');
+      } else {
+        setUser(null);
+        setSession(null);
+        toast.success('Logged out successfully');
+        // Force redirect to login page
+        window.location.href = '/login';
+      }
     } catch (error) {
       console.error('Logout error:', error);
+      toast.error('Error signing out');
+    } finally {
+      setLoading(false);
     }
   };
 
