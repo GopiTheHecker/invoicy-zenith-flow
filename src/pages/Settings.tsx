@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from '@/contexts/AuthContext';
+import { sendEmail } from '@/services/emailService';
 import { Mail, Save, Bell, Shield, Palette } from 'lucide-react';
 
 const Settings = () => {
@@ -44,6 +45,29 @@ Best regards,
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Load settings from localStorage on component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('app-settings');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      setEmailNotifications(settings.emailNotifications ?? true);
+      setInvoiceReminders(settings.invoiceReminders ?? true);
+      setPaymentNotifications(settings.paymentNotifications ?? true);
+      setDefaultCurrency(settings.defaultCurrency || 'INR');
+      setTaxRate(settings.taxRate || '18');
+      setInvoicePrefix(settings.invoicePrefix || 'INV');
+      setEmailSubject(settings.emailSubject || 'Invoice from {companyName}');
+      setEmailTemplate(settings.emailTemplate || `Dear Customer,
+
+Please find attached your invoice.
+
+Thank you for your business.
+
+Best regards,
+{companyName}`);
+    }
+  }, []);
+
   const handleCompanySettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -77,19 +101,34 @@ Best regards,
     
     setIsSubmitting(true);
     try {
-      // This would typically call your email service
-      // For now, we'll just show a success message
-      toast.success(`Test email sent to ${emailRecipient}`);
-    } catch (error) {
-      toast.error("Failed to send test email");
+      const processedSubject = emailSubject.replace('{companyName}', companyName || 'Your Company');
+      const processedTemplate = emailTemplate
+        .replace(/{companyName}/g, companyName || 'Your Company')
+        .replace(/{customerName}/g, 'Test Customer');
+
+      await sendEmail({
+        to: emailRecipient,
+        subject: `Test Email: ${processedSubject}`,
+        html: `
+          <h2>Test Email</h2>
+          <p>This is a test email from your invoice system.</p>
+          <hr>
+          <div style="white-space: pre-line;">${processedTemplate}</div>
+        `
+      });
+      
+      toast.success(`Test email sent successfully to ${emailRecipient}`);
+    } catch (error: any) {
+      console.error('Test email error:', error);
+      toast.error(error.message || "Failed to send test email");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleSaveSettings = () => {
-    // Save all settings to localStorage or your backend
-    localStorage.setItem('app-settings', JSON.stringify({
+    // Save all settings to localStorage
+    const settings = {
       emailNotifications,
       invoiceReminders,
       paymentNotifications,
@@ -98,8 +137,9 @@ Best regards,
       invoicePrefix,
       emailSubject,
       emailTemplate
-    }));
+    };
     
+    localStorage.setItem('app-settings', JSON.stringify(settings));
     toast.success("Settings saved successfully");
   };
 
@@ -191,8 +231,8 @@ Best regards,
                   placeholder="test@example.com"
                   className="flex-1"
                 />
-                <Button onClick={handleSendTestEmail} disabled={isSubmitting}>
-                  Send Test
+                <Button onClick={handleSendTestEmail} disabled={isSubmitting || !emailRecipient}>
+                  {isSubmitting ? 'Sending...' : 'Send Test'}
                 </Button>
               </div>
             </div>
