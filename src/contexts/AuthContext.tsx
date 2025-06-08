@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
@@ -50,20 +51,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change:', event, session);
+        console.log('Auth state change:', event, session?.user?.id);
+        
+        if (!isMounted) return;
+
         setSession(session);
-        setLoading(true);
         
         if (session?.user) {
-          await fetchUserProfile(session.user);
+          // Use setTimeout to prevent infinite loops
+          setTimeout(() => {
+            if (isMounted) {
+              fetchUserProfile(session.user);
+            }
+          }, 0);
         } else {
           setUser(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
@@ -71,32 +80,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('Initial session check:', session, error);
+        console.log('Initial session check:', session?.user?.id, error);
         
         if (error) {
           console.error('Error getting session:', error);
-          setLoading(false);
+          if (isMounted) {
+            setLoading(false);
+          }
           return;
         }
 
-        setSession(session);
-        if (session?.user) {
-          await fetchUserProfile(session.user);
+        if (isMounted) {
+          setSession(session);
+          if (session?.user) {
+            await fetchUserProfile(session.user);
+          } else {
+            setLoading(false);
+          }
         }
       } catch (error) {
         console.error('Error in auth initialization:', error);
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (authUser: User) => {
     try {
+      console.log('Fetching profile for user:', authUser.id);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -105,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
+        setLoading(false);
         return;
       }
 
@@ -127,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: authUser.id,
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
             email: authUser.email || '',
-            company_name: ''
+            company_name: authUser.user_metadata?.company_name || ''
           })
           .select()
           .single();
@@ -149,6 +171,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -251,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setSession(null);
         toast.success('Logged out successfully');
-        // Force redirect to login page
+        // Navigate to login page
         window.location.href = '/login';
       }
     } catch (error) {

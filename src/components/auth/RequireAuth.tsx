@@ -10,6 +10,8 @@ interface RequireAuthProps {
 const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   const { user, loading } = useAuth();
 
+  console.log('RequireAuth - user:', user?.id, 'loading:', loading);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -19,6 +21,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   }
 
   if (!user) {
+    console.log('RequireAuth - redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
