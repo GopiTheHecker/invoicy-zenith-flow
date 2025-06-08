@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -49,72 +49,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.id);
-        
-        if (!isMounted) return;
-
-        setSession(session);
-        
-        if (session?.user) {
-          // Use setTimeout to prevent infinite loops
-          setTimeout(() => {
-            if (isMounted) {
-              fetchUserProfile(session.user);
-            }
-          }, 0);
-        } else {
-          setUser(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    // Check for existing session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('Initial session check:', session?.user?.id, error);
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          if (isMounted) {
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (isMounted) {
-          setSession(session);
-          if (session?.user) {
-            await fetchUserProfile(session.user);
-          } else {
-            setLoading(false);
-          }
-        }
-      } catch (error) {
-        console.error('Error in auth initialization:', error);
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const fetchUserProfile = async (authUser: User) => {
+  const fetchUserProfile = useCallback(async (authUser: User) => {
     try {
       console.log('Fetching profile for user:', authUser.id);
       
@@ -122,11 +59,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
-        setLoading(false);
         return;
       }
 
@@ -152,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             company_name: authUser.user_metadata?.company_name || ''
           })
           .select()
-          .single();
+          .maybeSingle();
 
         if (insertError) {
           console.error('Error creating profile:', insertError);
@@ -171,10 +107,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing auth...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) {
+            setLoading(false);
+            setInitialized(true);
+          }
+          return;
+        }
+
+        console.log('Initial session:', session?.user?.id);
+        
+        if (mounted) {
+          setSession(session);
+          if (session?.user) {
+            await fetchUserProfile(session.user);
+          }
+          setLoading(false);
+          setInitialized(true);
+        }
+      } catch (error) {
+        console.error('Error in auth initialization:', error);
+        if (mounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.id);
+        
+        if (!mounted || !initialized) return;
+
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchUserProfile(session.user);
+        } else {
+          setUser(null);
+        }
+        
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchUserProfile, initialized]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -186,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password
       });
 
-      console.log('Login response:', { data, error });
+      console.log('Login response:', { user: data.user?.id, error });
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
@@ -240,7 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      console.log('Registration response:', { data, error });
+      console.log('Registration response:', { user: data.user?.id, error });
 
       if (error) {
         toast.error(error.message);
@@ -275,8 +272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setSession(null);
         toast.success('Logged out successfully');
-        // Navigate to login page
-        window.location.href = '/login';
+        // Force redirect to login
+        window.location.replace('/login');
       }
     } catch (error) {
       console.error('Logout error:', error);

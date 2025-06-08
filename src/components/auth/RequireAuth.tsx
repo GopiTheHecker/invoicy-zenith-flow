@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface RequireAuthProps {
@@ -9,6 +9,7 @@ interface RequireAuthProps {
 
 const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   console.log('RequireAuth - user:', user?.id, 'loading:', loading);
 
@@ -22,7 +23,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
 
   if (!user) {
     console.log('RequireAuth - redirecting to login');
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
